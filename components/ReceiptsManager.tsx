@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Receipt } from '../types';
+import { Receipt, AppSettings } from '../types';
 import { Button } from './Button';
 import { ReceiptModal } from './ReceiptModal';
 import { BaseModal } from './BaseModal';
-import { Printer, Trash2, Edit2, Plus, Search } from 'lucide-react';
+import { Printer, Trash2, Edit2, Plus, Search, Share2 } from 'lucide-react';
 
 interface ReceiptsManagerProps {
   receipts: Receipt[];
   setReceipts: React.Dispatch<React.SetStateAction<Receipt[]>>;
+  settings: AppSettings;
 }
 
-export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setReceipts }) => {
+export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setReceipts, settings }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [viewReceipt, setViewReceipt] = useState<Receipt | null>(null);
@@ -23,12 +24,16 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
     mobileNumber: '',
     amount: 0,
     date: new Date().toISOString().split('T')[0],
+    paymentMethod: 'UPI',
     notes: ''
   });
 
   const openForm = (receipt?: Receipt) => {
     if (receipt) {
-      setFormData(receipt);
+      setFormData({
+        ...receipt,
+        paymentMethod: receipt.paymentMethod || 'UPI' // Handle old records
+      });
       setSelectedReceipt(receipt);
     } else {
       setFormData({
@@ -37,6 +42,7 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
         mobileNumber: '',
         amount: 0,
         date: new Date().toISOString().split('T')[0],
+        paymentMethod: 'UPI',
         notes: ''
       });
       setSelectedReceipt(null);
@@ -53,6 +59,31 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
     if (confirm("Are you sure you want to delete this receipt permanently?")) {
       setReceipts(prev => prev.filter(r => r.id !== id));
     }
+  };
+
+  const handleShare = (receipt: Receipt) => {
+    const text = `*RENT RECEIPT - ${settings.pgName}*\n\n` +
+      `📅 Date: ${new Date(receipt.date).toLocaleDateString()}\n` +
+      `👤 Resident: ${receipt.residentName}\n` +
+      `🏠 Room: ${receipt.roomNumber}\n` +
+      `💰 Amount: ₹${receipt.amount.toLocaleString('en-IN')}\n` +
+      `💳 Paid via: ${receipt.paymentMethod || 'Cash'}\n\n` +
+      `Thank you!`;
+    
+    // Check if mobile number exists and add it to URL, otherwise generic share
+    // Removing spaces and non-digit chars from mobile for the link
+    const cleanMobile = receipt.mobileNumber.replace(/\D/g, '');
+    let url = '';
+    
+    if (cleanMobile.length >= 10) {
+       // Assume India +91 if not present, for better UX
+       const targetNumber = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
+       url = `https://wa.me/${targetNumber}?text=${encodeURIComponent(text)}`;
+    } else {
+       url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    }
+    
+    window.open(url, '_blank');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -133,10 +164,18 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
                       {receipt.roomNumber}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                      ₹{receipt.amount.toLocaleString('en-IN')}
+                      <div>₹{receipt.amount.toLocaleString('en-IN')}</div>
+                      <div className="text-[10px] text-gray-500 font-normal uppercase">{receipt.paymentMethod || 'Cash'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
+                         <button 
+                          onClick={() => handleShare(receipt)}
+                          className="text-green-500 hover:text-green-700"
+                          title="Share via WhatsApp"
+                        >
+                          <Share2 size={18} />
+                        </button>
                         <button 
                           onClick={() => setViewReceipt(receipt)}
                           className="text-gray-400 hover:text-blue-600"
@@ -219,15 +258,31 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-              <input 
-                required
-                type="date" 
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                value={formData.date}
-                onChange={e => setFormData({...formData, date: e.target.value})}
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+              <select 
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                value={formData.paymentMethod}
+                onChange={e => setFormData({...formData, paymentMethod: e.target.value})}
+              >
+                <option value="UPI">UPI</option>
+                <option value="Google Pay">Google Pay</option>
+                <option value="PhonePe">PhonePe</option>
+                <option value="Paytm">Paytm</option>
+                <option value="Cash">Cash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <input 
+              required
+              type="date" 
+              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              value={formData.date}
+              onChange={e => setFormData({...formData, date: e.target.value})}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
@@ -249,7 +304,8 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
       {viewReceipt && (
         <ReceiptModal 
           receipt={viewReceipt} 
-          onClose={() => setViewReceipt(null)} 
+          onClose={() => setViewReceipt(null)}
+          settings={settings}
         />
       )}
     </div>
