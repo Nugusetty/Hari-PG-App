@@ -3,6 +3,7 @@ export interface Resident {
   name: string;
   mobile: string;
   rentAmount: number;
+  joiningDate?: string;
   notes?: string;
 }
 
@@ -25,7 +26,16 @@ export interface Receipt {
   mobileNumber: string;
   amount: number;
   date: string;
+  paymentMethod: string; // 'Cash' | 'UPI' | 'Bank Transfer' | 'Other'
   notes?: string;
+}
+
+export interface AppSettings {
+  pgName: string;
+  pgSubtitle: string;
+  address: string;
+  phone: string;
+  signatureImage?: string;
 }
 
 export type ViewState = 'dashboard' | 'receipts';
