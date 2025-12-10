@@ -52,11 +52,6 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose, se
           {/* Printable Area - Identified by class for print media query */}
           <div className="print-area bg-white border-2 border-gray-800 p-8 rounded-sm text-gray-900 relative shadow-sm">
             
-            {/* PAID Stamp Watermark */}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-20 border-4 border-green-600 text-green-600 font-black text-6xl px-4 py-2 rounded -rotate-12 z-0">
-              PAID
-            </div>
-
             <div className="text-center mb-6 relative z-10">
               <h1 className="text-3xl font-bold uppercase tracking-wider mb-2">{settings.pgName}</h1>
               <p className="text-sm text-gray-600">{settings.pgSubtitle}</p>
@@ -127,7 +122,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose, se
                     <div className="border-b border-gray-400 w-full h-full"></div>
                   )}
                 </div>
-                <p className="text-xs font-bold uppercase">Authorized Signature</p>
+                <p className="text-lg font-serif italic mt-1 font-bold">Hari Kumar</p>
+                <p className="text-[10px] text-gray-500 uppercase mt-1">Authorized Signature</p>
               </div>
             </div>
           </div>

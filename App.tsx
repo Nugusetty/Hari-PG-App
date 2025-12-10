@@ -236,7 +236,7 @@ const App: React.FC = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 no-print pb-24">
         {activeTab === 'dashboard' ? (
-          <Dashboard floors={floors} setFloors={setFloors} />
+          <Dashboard floors={floors} setFloors={setFloors} receipts={receipts} />
         ) : (
           <ReceiptsManager receipts={receipts} setReceipts={setReceipts} settings={settings} />
         )}

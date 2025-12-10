@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { Floor, Resident } from '../types';
+import { Floor, Resident, Receipt } from '../types';
 import { Button } from './Button';
 import { BaseModal } from './BaseModal';
-import { Plus, Trash2, User, Home, Layers, ChevronDown, ChevronRight, UserPlus, Phone, Edit2 } from 'lucide-react';
+import { Plus, Trash2, User, Home, Layers, ChevronDown, ChevronRight, UserPlus, Phone, Edit2, Calendar, CheckCircle, XCircle } from 'lucide-react';
 
 interface DashboardProps {
   floors: Floor[];
   setFloors: React.Dispatch<React.SetStateAction<Floor[]>>;
+  receipts: Receipt[];
 }
 
 type ModalType = 'ADD_FLOOR' | 'ADD_ROOM' | 'RESIDENT_MODAL';
 
-export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipts }) => {
   const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
   
   // Modal State
@@ -23,13 +24,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors }) => {
   // Form State
   const [floorName, setFloorName] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
-  const [residentForm, setResidentForm] = useState({ name: '', mobile: '', rent: '' });
+  const [residentForm, setResidentForm] = useState({ name: '', mobile: '', rent: '', joiningDate: '' });
 
-  // Stats
+  // Stats Logic
   const totalRooms = floors.reduce((acc, floor) => acc + floor.rooms.length, 0);
   const totalResidents = floors.reduce((acc, floor) => 
     acc + floor.rooms.reduce((rAcc, room) => rAcc + room.residents.length, 0), 0
   );
+
+  // Calculate Paid/Unpaid for current month
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+
+  let paidCount = 0;
+  
+  floors.forEach(floor => {
+    floor.rooms.forEach(room => {
+      room.residents.forEach(resident => {
+        // Check if there is a receipt for this resident in the current month
+        const hasPaid = receipts.some(r => {
+           const rDate = new Date(r.date);
+           return r.residentName.trim().toLowerCase() === resident.name.trim().toLowerCase() && 
+                  rDate.getMonth() === currentMonth && 
+                  rDate.getFullYear() === currentYear;
+        });
+        if (hasPaid) paidCount++;
+      });
+    });
+  });
+
+  const unpaidCount = totalResidents - paidCount;
+  
+  // Calculate Percentages
+  const paidPercentage = totalResidents > 0 ? Math.round((paidCount / totalResidents) * 100) : 0;
+  const unpaidPercentage = totalResidents > 0 ? Math.round((unpaidCount / totalResidents) * 100) : 0;
 
   const toggleFloor = (floorId: string) => {
     const newExpanded = new Set(expandedFloors);
@@ -63,12 +91,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors }) => {
       setResidentForm({
         name: resident.name,
         mobile: resident.mobile,
-        rent: resident.rentAmount ? resident.rentAmount.toString() : ''
+        rent: resident.rentAmount ? resident.rentAmount.toString() : '',
+        joiningDate: resident.joiningDate || new Date().toISOString().split('T')[0]
       });
       setSelectedResidentId(resident.id);
     } else {
-      // Add Mode
-      setResidentForm({ name: '', mobile: '', rent: '' });
+      // Add Mode - Default to today
+      setResidentForm({ 
+        name: '', 
+        mobile: '', 
+        rent: '', 
+        joiningDate: new Date().toISOString().split('T')[0] 
+      });
       setSelectedResidentId(null);
     }
     
@@ -134,7 +168,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors }) => {
                         ...res,
                         name: residentForm.name,
                         mobile: residentForm.mobile,
-                        rentAmount: parseFloat(residentForm.rent) || 0
+                        rentAmount: parseFloat(residentForm.rent) || 0,
+                        joiningDate: residentForm.joiningDate
                       }
                     : res
                   )
@@ -145,7 +180,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors }) => {
                   id: Date.now().toString(),
                   name: residentForm.name,
                   mobile: residentForm.mobile,
-                  rentAmount: parseFloat(residentForm.rent) || 0
+                  rentAmount: parseFloat(residentForm.rent) || 0,
+                  joiningDate: residentForm.joiningDate
                 };
                 return {
                   ...room,
@@ -207,33 +243,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors }) => {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex items-center space-x-4">
-          <div className="p-3 bg-blue-100 rounded-full text-blue-600">
-            <Layers size={24} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Total Residents */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between h-full">
+          <div className="flex items-center space-x-2 text-gray-500 mb-2">
+            <User size={18} />
+            <span className="text-xs uppercase font-semibold">Residents</span>
           </div>
-          <div>
-            <p className="text-sm text-gray-500">Total Floors</p>
-            <p className="text-2xl font-bold text-gray-800">{floors.length}</p>
+          <p className="text-2xl font-bold text-gray-800">{totalResidents}</p>
+        </div>
+
+        {/* Paid Stats */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500 flex flex-col justify-between h-full">
+          <div className="flex items-center space-x-2 text-green-600 mb-2">
+            <CheckCircle size={18} />
+            <span className="text-xs uppercase font-semibold">Paid (This Month)</span>
+          </div>
+          <div className="flex items-baseline space-x-2">
+            <p className="text-2xl font-bold text-gray-800">{paidCount}</p>
+            {totalResidents > 0 && <span className="text-sm text-gray-500">({paidPercentage}%)</span>}
           </div>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex items-center space-x-4">
-          <div className="p-3 bg-green-100 rounded-full text-green-600">
-            <Home size={24} />
+
+        {/* Unpaid Stats */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-red-500 flex flex-col justify-between h-full">
+          <div className="flex items-center space-x-2 text-red-600 mb-2">
+            <XCircle size={18} />
+            <span className="text-xs uppercase font-semibold">Unpaid</span>
           </div>
-          <div>
-            <p className="text-sm text-gray-500">Total Rooms</p>
-            <p className="text-2xl font-bold text-gray-800">{totalRooms}</p>
+          <div className="flex items-baseline space-x-2">
+            <p className="text-2xl font-bold text-gray-800">{unpaidCount}</p>
+            {totalResidents > 0 && <span className="text-sm text-gray-500">({unpaidPercentage}%)</span>}
           </div>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex items-center space-x-4">
-          <div className="p-3 bg-purple-100 rounded-full text-purple-600">
-            <User size={24} />
+
+        {/* Total Rooms */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between h-full">
+          <div className="flex items-center space-x-2 text-gray-500 mb-2">
+            <Home size={18} />
+            <span className="text-xs uppercase font-semibold">Total Rooms</span>
           </div>
-          <div>
-            <p className="text-sm text-gray-500">Total Residents</p>
-            <p className="text-2xl font-bold text-gray-800">{totalResidents}</p>
-          </div>
+          <p className="text-2xl font-bold text-gray-800">{totalRooms}</p>
         </div>
       </div>
 
@@ -315,7 +365,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors }) => {
                             <User size={12} className="text-gray-400 mr-2 flex-shrink-0" />
                             <div className="truncate">
                               <p className="font-medium text-gray-800 truncate" title={resident.name}>{resident.name}</p>
-                              {resident.mobile && <p className="text-[10px] text-gray-500">{resident.mobile}</p>}
+                              <div className="flex flex-col">
+                                {resident.mobile && <p className="text-[10px] text-gray-500">{resident.mobile}</p>}
+                                {resident.joiningDate && (
+                                  <p className="text-[10px] text-blue-600 flex items-center mt-0.5">
+                                    <span className='opacity-75 mr-1'>Joined:</span> {new Date(resident.joiningDate).toLocaleDateString()}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center space-x-1 opacity-100">
@@ -440,15 +497,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors }) => {
                 onChange={e => setResidentForm({...residentForm, mobile: e.target.value})}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Rent Amount</label>
-              <input 
-                type="number" 
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                value={residentForm.rent}
-                onChange={e => setResidentForm({...residentForm, rent: e.target.value})}
-              />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Rent Amount</label>
+                <input 
+                  type="number" 
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  value={residentForm.rent}
+                  onChange={e => setResidentForm({...residentForm, rent: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Joining Date</label>
+                <div className="relative">
+                  <input 
+                    type="date" 
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    value={residentForm.joiningDate}
+                    onChange={e => setResidentForm({...residentForm, joiningDate: e.target.value})}
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <Calendar size={14} className="text-gray-400" />
+                  </div>
+                </div>
+              </div>
             </div>
+
           </div>
           <div className="flex justify-end space-x-2">
             <Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button>
