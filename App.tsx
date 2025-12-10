@@ -3,7 +3,7 @@ import { Floor, Receipt, ViewState, AppSettings } from './types';
 import { Dashboard } from './components/Dashboard';
 import { ReceiptsManager } from './components/ReceiptsManager';
 import { BaseModal } from './components/BaseModal';
-import { LayoutDashboard, ReceiptText, Building2, Settings, Download, Upload, Trash2, Save, Smartphone, Share, PlusSquare, MoreVertical, Github, QrCode, Link as LinkIcon, AlertCircle, PenTool, Image as ImageIcon } from 'lucide-react';
+import { LayoutDashboard, ReceiptText, Building2, Settings, Download, Upload, Trash2, Save, Smartphone, Github, QrCode, Link as LinkIcon, PenTool, Image as ImageIcon } from 'lucide-react';
 import { Button } from './components/Button';
 
 const App: React.FC = () => {

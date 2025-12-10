@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Floor, Resident, Receipt } from '../types';
 import { Button } from './Button';
 import { BaseModal } from './BaseModal';
-import { Plus, Trash2, User, Home, Layers, ChevronDown, ChevronRight, UserPlus, Phone, Edit2, Calendar, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Trash2, User, Home, ChevronDown, ChevronRight, UserPlus, Phone, Edit2, Calendar, CheckCircle, XCircle } from 'lucide-react';
 
 interface DashboardProps {
   floors: Floor[];
