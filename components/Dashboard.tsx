@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Floor, Resident, Receipt } from '../types';
 import { Button } from './Button';
 import { BaseModal } from './BaseModal';
-import { Plus, Trash2, User, Home, ChevronDown, ChevronRight, UserPlus, Phone, Edit2, Calendar, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Trash2, User, Home, ChevronDown, ChevronRight, UserPlus, Phone, Edit2, Calendar, CheckCircle, XCircle, AlertCircle, Share2, Eye, EyeOff, Clock } from 'lucide-react';
 
 interface DashboardProps {
   floors: Floor[];
@@ -14,6 +14,7 @@ type ModalType = 'ADD_FLOOR' | 'ADD_ROOM' | 'RESIDENT_MODAL';
 
 export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipts }) => {
   const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
+  const [showUnpaidList, setShowUnpaidList] = useState(false);
   
   // Modal State
   const [modalType, setModalType] = useState<ModalType | null>(null);
@@ -26,36 +27,84 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
   const [roomNumber, setRoomNumber] = useState('');
   const [residentForm, setResidentForm] = useState({ name: '', mobile: '', rent: '', joiningDate: '' });
 
-  // Stats Logic
-  const totalRooms = floors.reduce((acc, floor) => acc + floor.rooms.length, 0);
-  const totalResidents = floors.reduce((acc, floor) => 
-    acc + floor.rooms.reduce((rAcc, room) => rAcc + room.residents.length, 0), 0
-  );
-
-  // Calculate Paid/Unpaid for current month
+  // --- Stats Calculation Logic ---
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   let paidCount = 0;
+  
+  // We need to calculate status for every resident
+  const unpaidResidentsList: {
+    name: string, 
+    room: string, 
+    amount: number, 
+    mobile: string, 
+    id: string,
+    lastPaidDate?: string,
+    dueDate: Date
+  }[] = [];
   
   floors.forEach(floor => {
     floor.rooms.forEach(room => {
       room.residents.forEach(resident => {
-        // Check if there is a receipt for this resident in the current month
-        const hasPaid = receipts.some(r => {
+        // 1. Find all receipts for this resident
+        const residentReceipts = receipts.filter(r => 
+          r.residentName.trim().toLowerCase() === resident.name.trim().toLowerCase()
+        );
+
+        // 2. Sort by date descending (newest first)
+        residentReceipts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const lastReceipt = residentReceipts[0];
+
+        // 3. Check if paid CURRENT month
+        const hasPaidThisMonth = residentReceipts.some(r => {
            const rDate = new Date(r.date);
-           return r.residentName.trim().toLowerCase() === resident.name.trim().toLowerCase() && 
-                  rDate.getMonth() === currentMonth && 
-                  rDate.getFullYear() === currentYear;
+           return rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear;
         });
-        if (hasPaid) paidCount++;
+        
+        if (hasPaidThisMonth) {
+           paidCount++;
+        } else {
+           // Calculate Due Date
+           let nextDueDate = new Date();
+           
+           if (lastReceipt) {
+             // If they paid before, next due date is 1 month after last payment
+             const lastDate = new Date(lastReceipt.date);
+             nextDueDate = new Date(lastDate);
+             nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+           } else if (resident.joiningDate) {
+             // If never paid, due date is based on joining date
+             // We project the joining day to the current month
+             const joinDate = new Date(resident.joiningDate);
+             nextDueDate = new Date();
+             nextDueDate.setDate(joinDate.getDate()); 
+           }
+
+           unpaidResidentsList.push({
+             id: resident.id,
+             name: resident.name,
+             room: room.roomNumber,
+             amount: resident.rentAmount,
+             mobile: resident.mobile,
+             lastPaidDate: lastReceipt ? lastReceipt.date : undefined,
+             dueDate: nextDueDate
+           });
+        }
       });
     });
   });
 
-  const unpaidCount = totalResidents - paidCount;
+  // Sort unpaid list: Overdue first, then by date
+  unpaidResidentsList.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+
+  const totalRooms = floors.reduce((acc, floor) => acc + floor.rooms.length, 0);
+  const totalResidents = floors.reduce((acc, floor) => 
+    acc + floor.rooms.reduce((rAcc, room) => rAcc + room.residents.length, 0), 0
+  );
   
-  // Calculate Percentages
+  const unpaidCount = unpaidResidentsList.length;
   const paidPercentage = totalResidents > 0 ? Math.round((paidCount / totalResidents) * 100) : 0;
   const unpaidPercentage = totalResidents > 0 ? Math.round((unpaidCount / totalResidents) * 100) : 0;
 
@@ -87,7 +136,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     setSelectedRoomId(roomId);
     
     if (resident) {
-      // Edit Mode
       setResidentForm({
         name: resident.name,
         mobile: resident.mobile,
@@ -96,7 +144,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
       });
       setSelectedResidentId(resident.id);
     } else {
-      // Add Mode - Default to today
       setResidentForm({ 
         name: '', 
         mobile: '', 
@@ -240,55 +287,114 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     }
   };
 
+  // UPDATED: Specific text as requested
+  const sendPaymentReminder = (mobile: string) => {
+    // Standard format for WhatsApp API
+    const text = "Please pay the rent this month";
+    window.open(`https://wa.me/91${mobile.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Total Residents */}
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between h-full">
-          <div className="flex items-center space-x-2 text-gray-500 mb-2">
-            <User size={18} />
-            <span className="text-xs uppercase font-semibold">Residents</span>
+      
+      {/* Payment Stats Header */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+          <Calendar size={20} className="mr-2 text-blue-600" />
+          Payment Status: {monthNames[currentMonth]} {currentYear}
+        </h2>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
+            <p className="text-xs text-blue-600 uppercase font-semibold">Total Residents</p>
+            <p className="text-2xl font-bold text-gray-800">{totalResidents}</p>
           </div>
-          <p className="text-2xl font-bold text-gray-800">{totalResidents}</p>
+          
+          <div className="bg-green-50 p-3 rounded-md border border-green-100">
+            <p className="text-xs text-green-600 uppercase font-semibold flex items-center">
+              <CheckCircle size={12} className="mr-1" /> Paid
+            </p>
+            <div className="flex items-baseline space-x-2">
+              <p className="text-2xl font-bold text-gray-800">{paidCount}</p>
+              <span className="text-xs text-green-600 font-medium">({paidPercentage}%)</span>
+            </div>
+          </div>
+
+          <div className="bg-red-50 p-3 rounded-md border border-red-100 cursor-pointer hover:bg-red-100 transition-colors" onClick={() => setShowUnpaidList(!showUnpaidList)}>
+             <div className="flex justify-between items-start">
+              <div>
+                <p className="text-xs text-red-600 uppercase font-semibold flex items-center">
+                  <XCircle size={12} className="mr-1" /> Not Paid
+                </p>
+                <div className="flex items-baseline space-x-2">
+                  <p className="text-2xl font-bold text-gray-800">{unpaidCount}</p>
+                  <span className="text-xs text-red-600 font-medium">({unpaidPercentage}%)</span>
+                </div>
+              </div>
+              {showUnpaidList ? <EyeOff size={16} className="text-red-400" /> : <Eye size={16} className="text-red-400" />}
+             </div>
+          </div>
+
+          <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
+             <p className="text-xs text-gray-500 uppercase font-semibold">Total Rooms</p>
+             <p className="text-2xl font-bold text-gray-800">{totalRooms}</p>
+          </div>
         </div>
 
-        {/* Paid Stats */}
-        <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500 flex flex-col justify-between h-full">
-          <div className="flex items-center space-x-2 text-green-600 mb-2">
-            <CheckCircle size={18} />
-            <span className="text-xs uppercase font-semibold">Paid (This Month)</span>
+        {/* Unpaid List Collapsible */}
+        {showUnpaidList && unpaidResidentsList.length > 0 && (
+          <div className="mt-4 border-t pt-4 animate-in slide-in-from-top-2">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+              <AlertCircle size={16} className="mr-2 text-red-500" /> Pending Payments
+            </h3>
+            <div className="bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
+               <div className="max-h-60 overflow-y-auto">
+                 <table className="min-w-full divide-y divide-gray-200">
+                   <thead className="bg-gray-100">
+                     <tr>
+                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Name</th>
+                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Room</th>
+                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Due Date</th>
+                       <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Action</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-gray-200">
+                     {unpaidResidentsList.map((res) => {
+                       const isOverdue = new Date() > res.dueDate;
+                       return (
+                       <tr key={res.id} className={isOverdue ? "bg-red-50" : ""}>
+                         <td className="px-4 py-2 text-sm text-gray-900 font-medium">{res.name}</td>
+                         <td className="px-4 py-2 text-sm text-gray-600">{res.room}</td>
+                         <td className="px-4 py-2 text-sm">
+                           <div className="flex items-center">
+                              {isOverdue && <Clock size={12} className="text-red-500 mr-1" />}
+                              <span className={isOverdue ? "text-red-600 font-bold" : "text-gray-600"}>
+                                {res.dueDate.toLocaleDateString()}
+                              </span>
+                           </div>
+                         </td>
+                         <td className="px-4 py-2 text-right">
+                           {res.mobile && (
+                             <button 
+                               onClick={() => sendPaymentReminder(res.mobile)}
+                               className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-medium flex items-center justify-center ml-auto transition-colors"
+                             >
+                               <Share2 size={12} className="mr-1" /> WhatsApp
+                             </button>
+                           )}
+                         </td>
+                       </tr>
+                     )})}
+                   </tbody>
+                 </table>
+               </div>
+            </div>
           </div>
-          <div className="flex items-baseline space-x-2">
-            <p className="text-2xl font-bold text-gray-800">{paidCount}</p>
-            {totalResidents > 0 && <span className="text-sm text-gray-500">({paidPercentage}%)</span>}
-          </div>
-        </div>
-
-        {/* Unpaid Stats */}
-        <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-red-500 flex flex-col justify-between h-full">
-          <div className="flex items-center space-x-2 text-red-600 mb-2">
-            <XCircle size={18} />
-            <span className="text-xs uppercase font-semibold">Unpaid</span>
-          </div>
-          <div className="flex items-baseline space-x-2">
-            <p className="text-2xl font-bold text-gray-800">{unpaidCount}</p>
-            {totalResidents > 0 && <span className="text-sm text-gray-500">({unpaidPercentage}%)</span>}
-          </div>
-        </div>
-
-        {/* Total Rooms */}
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between h-full">
-          <div className="flex items-center space-x-2 text-gray-500 mb-2">
-            <Home size={18} />
-            <span className="text-xs uppercase font-semibold">Total Rooms</span>
-          </div>
-          <p className="text-2xl font-bold text-gray-800">{totalRooms}</p>
-        </div>
+        )}
       </div>
 
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-800">Structure Overview</h2>
+      <div className="flex justify-between items-center mt-8">
+        <h2 className="text-xl font-semibold text-gray-800">Room Management</h2>
         <Button onClick={openAddFloor} size="sm">
           <Plus size={16} className="mr-2" /> Add Floor
         </Button>
