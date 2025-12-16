@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Floor, Resident, Receipt } from '../types';
 import { Button } from './Button';
 import { BaseModal } from './BaseModal';
-import { Plus, Trash2, User, Home, ChevronDown, ChevronRight, UserPlus, Phone, Edit2, Calendar, CheckCircle, XCircle, AlertCircle, Share2, Eye, EyeOff, Clock, Bell, CheckSquare, MessageCircle } from 'lucide-react';
+import { Plus, Trash2, User, Home, ChevronDown, ChevronRight, UserPlus, Phone, Edit2, Calendar, CheckCircle, Bell, Share2, XCircle, Eye } from 'lucide-react';
 
 interface DashboardProps {
   floors: Floor[];
@@ -15,13 +15,16 @@ type ModalType = 'ADD_FLOOR' | 'ADD_ROOM' | 'RESIDENT_MODAL' | 'DUE_REMINDERS';
 
 export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipts, setReceipts }) => {
   const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
-  const [showUnpaidList, setShowUnpaidList] = useState(false);
   
-  // Modal State
+  // Modal State initialized to null so it doesn't open automatically
   const [modalType, setModalType] = useState<ModalType | null>(null);
+  
   const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedResidentId, setSelectedResidentId] = useState<string | null>(null);
+
+  // State to track dismissed alerts (so they are removed from popup but residents remain in rooms)
+  const [dismissedResidentIds, setDismissedResidentIds] = useState<Set<string>>(new Set());
 
   // Form State
   const [floorName, setFloorName] = useState('');
@@ -33,9 +36,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
   const currentYear = new Date().getFullYear();
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-  let paidCount = 0;
-  
-  // We need to calculate status for every resident
+  // Calculate unpaid residents dynamically
   const unpaidResidentsList: {
     id: string,
     floorId: string,
@@ -51,6 +52,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
   floors.forEach(floor => {
     floor.rooms.forEach(room => {
       room.residents.forEach(resident => {
+        // Skip if this alert has been dismissed for this session
+        if (dismissedResidentIds.has(resident.id)) return;
+
         // 1. Find all receipts for this resident
         const residentReceipts = receipts.filter(r => 
           r.residentName.trim().toLowerCase() === resident.name.trim().toLowerCase()
@@ -60,58 +64,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
         residentReceipts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         const lastReceipt = residentReceipts[0];
 
-        // 3. Check if paid CURRENT month (Optional check, mainly for stats)
-        const hasPaidThisMonth = residentReceipts.some(r => {
-           const rDate = new Date(r.date);
-           return rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear;
-        });
-        
-        if (hasPaidThisMonth) {
-           paidCount++;
-        }
-
-        // --- NEW DUE DATE LOGIC ---
-        // Requirement: 
-        // 1. If Paid Dec 15 -> Due Jan 15.
-        // 2. If Added Dec 1 -> Due Jan 1 (Assuming paid on Dec 1).
-        
+        // --- DUE DATE LOGIC ---
         let nextDueDate: Date;
 
         if (lastReceipt) {
-          // If they have paid before, the next due date is exactly 1 month after the last payment date.
+          // If paid before, due date is 1 month after last payment
           const lastPaidDate = new Date(lastReceipt.date);
           nextDueDate = new Date(lastPaidDate);
           nextDueDate.setMonth(lastPaidDate.getMonth() + 1);
         } else {
-          // If they have NEVER paid, the due date is their joining date (entry date).
-          // If they joined today, they owe today.
+          // If never paid, due date is joining date (or today if missing)
           if (resident.joiningDate) {
             nextDueDate = new Date(resident.joiningDate);
           } else {
-            nextDueDate = new Date(); // Fallback to today
+            nextDueDate = new Date();
           }
         }
 
-        // Check if the calculated due date has arrived or passed
-        // We compare the dates at midnight to avoid time discrepancies
+        // Compare dates (ignoring time)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const dueCheck = new Date(nextDueDate);
         dueCheck.setHours(0, 0, 0, 0);
 
-        // Logic: 
-        // If hasPaidThisMonth is true, they are effectively "safe" for the calendar month usually, 
-        // BUT strict "30 day" cycle means we rely solely on nextDueDate.
-        // If nextDueDate <= today, they show up in the list.
-        
+        // If due date is today or passed, add to unpaid list
         if (dueCheck <= today) {
-           // We ensure we don't double count if hasPaidThisMonth is true but the calculation differs.
-           // However, if they paid on the 1st, and today is the 2nd of next month, hasPaidThisMonth (current calendar month) might be false.
-           // The most robust way is strictly: Is Today >= NextDueDate?
-           
-           // One edge case: If I paid on Jan 2nd (for Jan), and today is Jan 25th.
-           // Next due is Feb 2nd. Feb 2nd > Jan 25th. Not due yet.
-           
            unpaidResidentsList.push({
              id: resident.id,
              floorId: floor.id,
@@ -128,7 +105,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     });
   });
 
-  // Sort unpaid list: Oldest due dates first (most urgent)
+  // Sort unpaid list: Oldest due dates first
   unpaidResidentsList.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
 
   const totalRooms = floors.reduce((acc, floor) => acc + floor.rooms.length, 0);
@@ -137,22 +114,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
   );
   
   const unpaidCount = unpaidResidentsList.length;
+  const paidCount = Math.max(0, totalResidents - unpaidCount);
+  
   const paidPercentage = totalResidents > 0 ? Math.round((paidCount / totalResidents) * 100) : 0;
   const unpaidPercentage = totalResidents > 0 ? Math.round((unpaidCount / totalResidents) * 100) : 0;
-
-  // --- Automatic Popup Logic ---
-  // Check if there are any dues when component mounts
-  useEffect(() => {
-    // Only show if there are unpaid residents
-    if (unpaidResidentsList.length > 0) {
-      // Check if we haven't shown it this session to avoid annoyance
-      const hasShown = sessionStorage.getItem('hasShownDueModal');
-      if (!hasShown) {
-        setModalType('DUE_REMINDERS');
-        sessionStorage.setItem('hasShownDueModal', 'true');
-      }
-    }
-  }, [unpaidResidentsList.length]);
 
   const toggleFloor = (floorId: string) => {
     const newExpanded = new Set(expandedFloors);
@@ -164,7 +129,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     setExpandedFloors(newExpanded);
   };
 
-  // --- Handlers for opening Modals ---
+  // --- Handlers ---
 
   const openAddFloor = () => {
     setFloorName('');
@@ -252,7 +217,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
           rooms: floor.rooms.map(room => {
             if (room.id === selectedRoomId) {
               if (selectedResidentId) {
-                // Update existing resident
+                // Update
                 return {
                   ...room,
                   residents: room.residents.map(res => 
@@ -268,7 +233,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                   )
                 };
               } else {
-                // Add new resident
+                // Add
                 const newResident: Resident = {
                   id: Date.now().toString(),
                   name: residentForm.name,
@@ -289,6 +254,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
       return floor;
     }));
     closeModal();
+  };
+
+  // Only removes the alert from the popup view
+  const handleDismissAlert = (residentId: string) => {
+    if (confirm("Remove this due date alert? The resident will remain in the room.")) {
+      setDismissedResidentIds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(residentId);
+        return newSet;
+      });
+    }
   };
 
   const deleteFloor = (floorId: string) => {
@@ -333,33 +309,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     }
   };
 
-  // UPDATED: Reminder text for WhatsApp
   const sendPaymentReminder = (mobile: string, name: string, dueDate: Date) => {
     const formattedDate = dueDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-    // Text requested: "Your due date has passed. Please pay the rent."
-    // WhatsApp format often needs to be conversational
     const text = `Hello ${name}, your rent due date ${formattedDate} has passed. Please pay the rent.`;
     window.open(`https://wa.me/91${mobile.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank');
-  };
-
-  // NEW: Handle "Paid" action
-  const handleMarkPaid = (resident: typeof unpaidResidentsList[0]) => {
-     if (!confirm(`Mark rent as PAID for ${resident.name}? This will create a receipt for ₹${resident.amount}.`)) {
-       return;
-     }
-
-     const newReceipt: Receipt = {
-        id: Date.now().toString(),
-        residentName: resident.name,
-        roomNumber: resident.room,
-        mobileNumber: resident.mobile,
-        amount: resident.amount,
-        date: new Date().toISOString().split('T')[0],
-        paymentMethod: 'Cash', 
-        notes: 'Marked as Paid from Dashboard Alert'
-     };
-     
-     setReceipts(prev => [newReceipt, ...prev]);
   };
 
   return (
@@ -372,7 +325,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
             <Calendar size={20} className="mr-2 text-blue-600" />
             Payment Status: {monthNames[currentMonth]} {currentYear}
           </h2>
-          {/* Notification Bell */}
+          {/* Notification Bell - Opens 'DUE_REMINDERS' on click */}
           <button 
             onClick={() => setModalType('DUE_REMINDERS')}
             className="relative p-2 text-gray-500 hover:text-blue-600 transition-colors"
@@ -387,93 +340,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
           </button>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
-            <p className="text-xs text-blue-600 uppercase font-semibold">Total Residents</p>
-            <p className="text-2xl font-bold text-gray-800">{totalResidents}</p>
-          </div>
+        {/* Stats Cards - Matches Screenshot */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           
-          <div className="bg-green-50 p-3 rounded-md border border-green-100">
-            <p className="text-xs text-green-600 uppercase font-semibold flex items-center">
-              <CheckCircle size={12} className="mr-1" /> Paid
-            </p>
-            <div className="flex items-baseline space-x-2">
-              <p className="text-2xl font-bold text-gray-800">{paidCount}</p>
-              <span className="text-xs text-green-600 font-medium">({paidPercentage}%)</span>
-            </div>
+          {/* 1. Total Residents (Blue) */}
+          <div className="bg-blue-50 p-3 rounded-md border border-blue-100 flex flex-col justify-between h-24">
+            <p className="text-xs text-blue-600 uppercase font-semibold">Total Residents</p>
+            <p className="text-3xl font-bold text-gray-800">{totalResidents}</p>
           </div>
 
-          <div className="bg-red-50 p-3 rounded-md border border-red-100 cursor-pointer hover:bg-red-100 transition-colors" onClick={() => setShowUnpaidList(!showUnpaidList)}>
+          {/* 2. Paid (Green) */}
+          <div className="bg-green-50 p-3 rounded-md border border-green-100 flex flex-col justify-between h-24">
              <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs text-red-600 uppercase font-semibold flex items-center">
-                  <XCircle size={12} className="mr-1" /> Not Paid
-                </p>
-                <div className="flex items-baseline space-x-2">
-                  <p className="text-2xl font-bold text-gray-800">{unpaidCount}</p>
-                  <span className="text-xs text-red-600 font-medium">({unpaidPercentage}%)</span>
-                </div>
-              </div>
-              {showUnpaidList ? <EyeOff size={16} className="text-red-400" /> : <Eye size={16} className="text-red-400" />}
+               <p className="text-xs text-green-600 uppercase font-semibold flex items-center">
+                 <CheckCircle size={14} className="mr-1" /> Paid
+               </p>
+             </div>
+             <div>
+               <span className="text-3xl font-bold text-gray-800">{paidCount}</span>
+               <span className="text-sm text-green-600 ml-2">({paidPercentage}%)</span>
              </div>
           </div>
 
-          <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
+          {/* 3. Not Paid (Red) */}
+          <div className="bg-red-50 p-3 rounded-md border border-red-100 flex flex-col justify-between h-24 relative">
+             <div className="flex justify-between items-start">
+               <p className="text-xs text-red-600 uppercase font-semibold flex items-center">
+                 <XCircle size={14} className="mr-1" /> Not Paid
+               </p>
+               <button onClick={() => setModalType('DUE_REMINDERS')} className="text-red-400 hover:text-red-600">
+                  <Eye size={16} />
+               </button>
+             </div>
+             <div>
+               <span className="text-3xl font-bold text-gray-800">{unpaidCount}</span>
+               <span className="text-sm text-red-600 ml-2">({unpaidPercentage}%)</span>
+             </div>
+          </div>
+
+          {/* 4. Total Rooms (Gray) */}
+          <div className="bg-gray-50 p-3 rounded-md border border-gray-200 flex flex-col justify-between h-24">
              <p className="text-xs text-gray-500 uppercase font-semibold">Total Rooms</p>
-             <p className="text-2xl font-bold text-gray-800">{totalRooms}</p>
+             <p className="text-3xl font-bold text-gray-800">{totalRooms}</p>
           </div>
         </div>
-
-        {/* Unpaid List Collapsible */}
-        {showUnpaidList && unpaidResidentsList.length > 0 && (
-          <div className="mt-4 border-t pt-4 animate-in slide-in-from-top-2">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-              <AlertCircle size={16} className="mr-2 text-red-500" /> Pending Payments
-            </h3>
-            <div className="bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
-               <div className="max-h-60 overflow-y-auto">
-                 <table className="min-w-full divide-y divide-gray-200">
-                   <thead className="bg-gray-100">
-                     <tr>
-                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Name</th>
-                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Room</th>
-                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Due Date</th>
-                       <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Action</th>
-                     </tr>
-                   </thead>
-                   <tbody className="divide-y divide-gray-200">
-                     {unpaidResidentsList.map((res) => {
-                       const isOverdue = new Date() >= res.dueDate;
-                       return (
-                       <tr key={res.id} className={isOverdue ? "bg-red-50" : ""}>
-                         <td className="px-4 py-2 text-sm text-gray-900 font-medium">{res.name}</td>
-                         <td className="px-4 py-2 text-sm text-gray-600">{res.room}</td>
-                         <td className="px-4 py-2 text-sm">
-                           <div className="flex items-center">
-                              {isOverdue && <Clock size={12} className="text-red-500 mr-1" />}
-                              <span className={isOverdue ? "text-red-600 font-bold" : "text-gray-600"}>
-                                {res.dueDate.toLocaleDateString()}
-                              </span>
-                           </div>
-                         </td>
-                         <td className="px-4 py-2 text-right">
-                           {res.mobile && (
-                             <button 
-                               onClick={() => sendPaymentReminder(res.mobile, res.name, res.dueDate)}
-                               className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-medium flex items-center justify-center ml-auto transition-colors"
-                             >
-                               <Share2 size={12} className="mr-1" /> WhatsApp
-                             </button>
-                           )}
-                         </td>
-                       </tr>
-                     )})}
-                   </tbody>
-                 </table>
-               </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="flex justify-between items-center mt-8">
@@ -652,17 +562,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                       </p>
                     )}
                     
-                    {/* ACTION BUTTONS */}
+                    {/* ACTION BUTTONS: DELETE and SHARE only. */}
                     <div className="grid grid-cols-2 gap-3 mt-2">
+                       {/* REMOVE BUTTON - dismisses alert only */}
                        <Button 
                          size="sm" 
                          variant="danger"
                          className="flex items-center justify-center text-xs"
-                         onClick={() => deleteResident(res.floorId, res.roomId, res.id)}
+                         onClick={() => handleDismissAlert(res.id)}
                        >
-                         <Trash2 size={14} className="mr-1" /> Delete
+                         <Trash2 size={14} className="mr-1" /> Remove
                        </Button>
 
+                       {/* SHARE BUTTON */}
                        {res.mobile ? (
                         <Button 
                           size="sm" 
@@ -690,6 +602,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
         </div>
       </BaseModal>
       
+      {/* OTHER MODALS (Add Floor, Add Room, Resident) */}
       <BaseModal 
         isOpen={modalType === 'ADD_FLOOR'} 
         onClose={closeModal} 
