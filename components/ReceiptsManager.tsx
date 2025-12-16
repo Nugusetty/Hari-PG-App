@@ -61,31 +61,6 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
     }
   };
 
-  const handleShare = (receipt: Receipt) => {
-    const text = `*RENT RECEIPT - ${settings.pgName}*\n\n` +
-      `📅 Date: ${new Date(receipt.date).toLocaleDateString()}\n` +
-      `👤 Resident: ${receipt.residentName}\n` +
-      `🏠 Room: ${receipt.roomNumber}\n` +
-      `💰 Amount: ₹${receipt.amount.toLocaleString('en-IN')}\n` +
-      `💳 Paid via: ${receipt.paymentMethod || 'Cash'}\n\n` +
-      `Thank you!`;
-    
-    // Check if mobile number exists and add it to URL, otherwise generic share
-    // Removing spaces and non-digit chars from mobile for the link
-    const cleanMobile = receipt.mobileNumber.replace(/\D/g, '');
-    let url = '';
-    
-    if (cleanMobile.length >= 10) {
-       // Assume India +91 if not present, for better UX
-       const targetNumber = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
-       url = `https://wa.me/${targetNumber}?text=${encodeURIComponent(text)}`;
-    } else {
-       url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    }
-    
-    window.open(url, '_blank');
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -184,22 +159,15 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
                          <button 
-                          onClick={() => handleShare(receipt)}
+                          onClick={() => setViewReceipt(receipt)}
                           className="text-green-500 hover:text-green-700"
-                          title="Share via WhatsApp"
+                          title="View & Share Receipt"
                         >
                           <Share2 size={18} />
                         </button>
                         <button 
-                          onClick={() => setViewReceipt(receipt)}
-                          className="text-gray-400 hover:text-blue-600"
-                          title="Print"
-                        >
-                          <Printer size={18} />
-                        </button>
-                        <button 
                           onClick={() => openForm(receipt)}
-                          className="text-gray-400 hover:text-green-600"
+                          className="text-gray-400 hover:text-blue-600"
                           title="Edit"
                         >
                           <Edit2 size={18} />

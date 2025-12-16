@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Floor, Resident, Receipt } from '../types';
 import { Button } from './Button';
 import { BaseModal } from './BaseModal';
@@ -22,8 +22,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedResidentId, setSelectedResidentId] = useState<string | null>(null);
 
-  // State to track dismissed alerts (so they are removed from popup but residents remain in rooms)
-  const [dismissedResidentIds, setDismissedResidentIds] = useState<Set<string>>(new Set());
+  // Persistence for dismissed alerts: Map of residentId -> dismissedDueDateString
+  const [dismissedAlerts, setDismissedAlerts] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('hari_pg_v3_dismissed_alerts');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Save dismissed alerts to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('hari_pg_v3_dismissed_alerts', JSON.stringify(dismissedAlerts));
+  }, [dismissedAlerts]);
 
   // Form State
   const [floorName, setFloorName] = useState('');
@@ -51,9 +63,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
   floors.forEach(floor => {
     floor.rooms.forEach(room => {
       room.residents.forEach(resident => {
-        // Skip if this alert has been dismissed for this session
-        if (dismissedResidentIds.has(resident.id)) return;
-
         // 1. Find all receipts for this resident
         const residentReceipts = receipts.filter(r => 
           r.residentName.trim().toLowerCase() === resident.name.trim().toLowerCase()
@@ -79,6 +88,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
             nextDueDate = new Date();
           }
         }
+
+        // Check if this specific due date has been dismissed
+        // We use toDateString() to compare just the date part, ignoring time differences
+        const dateToken = nextDueDate.toDateString();
+        if (dismissedAlerts[resident.id] === dateToken) return;
 
         // Compare dates (ignoring time)
         const today = new Date();
@@ -255,14 +269,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     closeModal();
   };
 
-  // Only removes the alert from the popup view
-  const handleDismissAlert = (residentId: string) => {
-    if (confirm("Remove this due date alert? The resident will remain in the room.")) {
-      setDismissedResidentIds(prev => {
-        const newSet = new Set(prev);
-        newSet.add(residentId);
-        return newSet;
-      });
+  // Permanently dismiss the alert for the specific due date
+  const handleDismissAlert = (residentId: string, dueDate: Date) => {
+    if (confirm("Remove this due date alert? The alert will remain hidden until the next due date cycle.")) {
+      const dateToken = dueDate.toDateString();
+      setDismissedAlerts(prev => ({
+        ...prev,
+        [residentId]: dateToken
+      }));
     }
   };
 
@@ -340,7 +354,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
         </div>
         
         {/* Stats Cards - Matches Screenshot */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           
           {/* 1. Total Residents (Blue) */}
           <div className="bg-blue-50 p-3 rounded-md border border-blue-100 flex flex-col justify-between h-24">
@@ -568,7 +582,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                          size="sm" 
                          variant="danger"
                          className="flex items-center justify-center text-xs"
-                         onClick={() => handleDismissAlert(res.id)}
+                         onClick={() => handleDismissAlert(res.id, res.dueDate)}
                        >
                          <Trash2 size={14} className="mr-1" /> Remove
                        </Button>

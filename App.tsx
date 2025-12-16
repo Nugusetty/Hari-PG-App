@@ -21,7 +21,8 @@ const App: React.FC = () => {
 
   // Initialize settings
   const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('hari_pg_settings');
+    // Changed key to ensure clean slate
+    const saved = localStorage.getItem('hari_pg_v2_settings');
     return saved ? JSON.parse(saved) : {
       pgName: "Hari PG",
       pgSubtitle: "Luxury Men's Hostel & Accommodation",
@@ -46,26 +47,28 @@ const App: React.FC = () => {
   
   // Initialize state from local storage or defaults
   const [floors, setFloors] = useState<Floor[]>(() => {
-    const saved = localStorage.getItem('hari_pg_floors');
+    // Changed key to ensure clean slate (removes old data like 'Rajesh')
+    const saved = localStorage.getItem('hari_pg_v2_floors');
     return saved ? JSON.parse(saved) : [];
   });
 
   const [receipts, setReceipts] = useState<Receipt[]>(() => {
-    const saved = localStorage.getItem('hari_pg_receipts');
+    // Changed key to ensure clean slate (removes old data like 'Rajesh')
+    const saved = localStorage.getItem('hari_pg_v2_receipts');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Persistence
+  // Persistence with new keys
   useEffect(() => {
-    localStorage.setItem('hari_pg_floors', JSON.stringify(floors));
+    localStorage.setItem('hari_pg_v2_floors', JSON.stringify(floors));
   }, [floors]);
 
   useEffect(() => {
-    localStorage.setItem('hari_pg_receipts', JSON.stringify(receipts));
+    localStorage.setItem('hari_pg_v2_receipts', JSON.stringify(receipts));
   }, [receipts]);
 
   useEffect(() => {
-    localStorage.setItem('hari_pg_settings', JSON.stringify(settings));
+    localStorage.setItem('hari_pg_v2_settings', JSON.stringify(settings));
   }, [settings]);
 
   // --- Handlers ---
@@ -244,8 +247,8 @@ const App: React.FC = () => {
     if (confirmText === 'DELETE') {
       setFloors([]);
       setReceipts([]);
-      localStorage.removeItem('hari_pg_floors');
-      localStorage.removeItem('hari_pg_receipts');
+      localStorage.removeItem('hari_pg_v2_floors');
+      localStorage.removeItem('hari_pg_v2_receipts');
       alert("App data has been reset.");
       setIsSettingsOpen(false);
     }
