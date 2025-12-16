@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Floor, Resident, Receipt } from '../types';
 import { Button } from './Button';
 import { BaseModal } from './BaseModal';
-import { Plus, Trash2, User, Home, ChevronDown, ChevronRight, UserPlus, Phone, Edit2, Calendar, CheckCircle, XCircle, AlertCircle, Share2, Eye, EyeOff, Clock } from 'lucide-react';
+import { Plus, Trash2, User, Home, ChevronDown, ChevronRight, UserPlus, Phone, Edit2, Calendar, CheckCircle, XCircle, AlertCircle, Share2, Eye, EyeOff, Clock, Bell } from 'lucide-react';
 
 interface DashboardProps {
   floors: Floor[];
@@ -10,7 +10,7 @@ interface DashboardProps {
   receipts: Receipt[];
 }
 
-type ModalType = 'ADD_FLOOR' | 'ADD_ROOM' | 'RESIDENT_MODAL';
+type ModalType = 'ADD_FLOOR' | 'ADD_ROOM' | 'RESIDENT_MODAL' | 'DUE_REMINDERS';
 
 export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipts }) => {
   const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
@@ -57,7 +57,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
         residentReceipts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         const lastReceipt = residentReceipts[0];
 
-        // 3. Check if paid CURRENT month
+        // 3. Check if paid CURRENT month (Optional check, mainly for stats)
         const hasPaidThisMonth = residentReceipts.some(r => {
            const rDate = new Date(r.date);
            return rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear;
@@ -65,23 +65,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
         
         if (hasPaidThisMonth) {
            paidCount++;
-        } else {
-           // Calculate Due Date
-           let nextDueDate = new Date();
-           
-           if (lastReceipt) {
-             // If they paid before, next due date is 1 month after last payment
-             const lastDate = new Date(lastReceipt.date);
-             nextDueDate = new Date(lastDate);
-             nextDueDate.setMonth(nextDueDate.getMonth() + 1);
-           } else if (resident.joiningDate) {
-             // If never paid, due date is based on joining date
-             // We project the joining day to the current month
-             const joinDate = new Date(resident.joiningDate);
-             nextDueDate = new Date();
-             nextDueDate.setDate(joinDate.getDate()); 
-           }
+        }
 
+        // --- NEW DUE DATE LOGIC ---
+        // Requirement: 
+        // 1. If Paid Dec 15 -> Due Jan 15.
+        // 2. If Added Dec 1 -> Due Jan 1 (Assuming paid on Dec 1).
+        
+        let nextDueDate: Date;
+
+        if (lastReceipt) {
+          // If they have paid before, the next due date is exactly 1 month after the last payment date.
+          const lastPaidDate = new Date(lastReceipt.date);
+          nextDueDate = new Date(lastPaidDate);
+          nextDueDate.setMonth(lastPaidDate.getMonth() + 1);
+        } else {
+          // If they have NEVER paid, the due date is their joining date (entry date).
+          // If they joined today, they owe today.
+          if (resident.joiningDate) {
+            nextDueDate = new Date(resident.joiningDate);
+          } else {
+            nextDueDate = new Date(); // Fallback to today
+          }
+        }
+
+        // Check if the calculated due date has arrived or passed
+        // We compare the dates at midnight to avoid time discrepancies
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dueCheck = new Date(nextDueDate);
+        dueCheck.setHours(0, 0, 0, 0);
+
+        // Logic: 
+        // If hasPaidThisMonth is true, they are effectively "safe" for the calendar month usually, 
+        // BUT strict "30 day" cycle means we rely solely on nextDueDate.
+        // If nextDueDate <= today, they show up in the list.
+        
+        if (dueCheck <= today) {
+           // We ensure we don't double count if hasPaidThisMonth is true but the calculation differs.
+           // However, if they paid on the 1st, and today is the 2nd of next month, hasPaidThisMonth (current calendar month) might be false.
+           // The most robust way is strictly: Is Today >= NextDueDate?
+           
+           // One edge case: If I paid on Jan 2nd (for Jan), and today is Jan 25th.
+           // Next due is Feb 2nd. Feb 2nd > Jan 25th. Not due yet.
+           
            unpaidResidentsList.push({
              id: resident.id,
              name: resident.name,
@@ -96,7 +123,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     });
   });
 
-  // Sort unpaid list: Overdue first, then by date
+  // Sort unpaid list: Oldest due dates first (most urgent)
   unpaidResidentsList.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
 
   const totalRooms = floors.reduce((acc, floor) => acc + floor.rooms.length, 0);
@@ -107,6 +134,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
   const unpaidCount = unpaidResidentsList.length;
   const paidPercentage = totalResidents > 0 ? Math.round((paidCount / totalResidents) * 100) : 0;
   const unpaidPercentage = totalResidents > 0 ? Math.round((unpaidCount / totalResidents) * 100) : 0;
+
+  // --- Automatic Popup Logic ---
+  // Check if there are any dues when component mounts
+  useEffect(() => {
+    // Only show if there are unpaid residents
+    if (unpaidResidentsList.length > 0) {
+      // Check if we haven't shown it this session to avoid annoyance
+      const hasShown = sessionStorage.getItem('hasShownDueModal');
+      if (!hasShown) {
+        setModalType('DUE_REMINDERS');
+        sessionStorage.setItem('hasShownDueModal', 'true');
+      }
+    }
+  }, [unpaidResidentsList.length]);
 
   const toggleFloor = (floorId: string) => {
     const newExpanded = new Set(expandedFloors);
@@ -287,10 +328,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     }
   };
 
-  // UPDATED: Specific text as requested
-  const sendPaymentReminder = (mobile: string) => {
-    // Standard format for WhatsApp API
-    const text = "Please pay the rent this month";
+  // UPDATED: Reminder text for WhatsApp
+  const sendPaymentReminder = (mobile: string, name: string, dueDate: Date) => {
+    const formattedDate = dueDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    // Text requested: "Your due date has passed. Please pay the rent."
+    // WhatsApp format often needs to be conversational
+    const text = `Hello ${name}, your rent due date ${formattedDate} has passed. Please pay the rent.`;
     window.open(`https://wa.me/91${mobile.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -299,10 +342,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
       
       {/* Payment Stats Header */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-          <Calendar size={20} className="mr-2 text-blue-600" />
-          Payment Status: {monthNames[currentMonth]} {currentYear}
-        </h2>
+        <div className="flex justify-between items-start mb-4">
+          <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+            <Calendar size={20} className="mr-2 text-blue-600" />
+            Payment Status: {monthNames[currentMonth]} {currentYear}
+          </h2>
+          {/* Notification Bell */}
+          <button 
+            onClick={() => setModalType('DUE_REMINDERS')}
+            className="relative p-2 text-gray-500 hover:text-blue-600 transition-colors"
+            title="View Upcoming Dues"
+          >
+            <Bell size={22} />
+            {unpaidCount > 0 && (
+              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-red-100 transform translate-x-1/4 -translate-y-1/4 bg-red-600 rounded-full">
+                {unpaidCount}
+              </span>
+            )}
+          </button>
+        </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
@@ -360,7 +418,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                    </thead>
                    <tbody className="divide-y divide-gray-200">
                      {unpaidResidentsList.map((res) => {
-                       const isOverdue = new Date() > res.dueDate;
+                       const isOverdue = new Date() >= res.dueDate;
                        return (
                        <tr key={res.id} className={isOverdue ? "bg-red-50" : ""}>
                          <td className="px-4 py-2 text-sm text-gray-900 font-medium">{res.name}</td>
@@ -376,7 +434,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                          <td className="px-4 py-2 text-right">
                            {res.mobile && (
                              <button 
-                               onClick={() => sendPaymentReminder(res.mobile)}
+                               onClick={() => sendPaymentReminder(res.mobile, res.name, res.dueDate)}
                                className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-medium flex items-center justify-center ml-auto transition-colors"
                              >
                                <Share2 size={12} className="mr-1" /> WhatsApp
@@ -475,7 +533,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                                 {resident.mobile && <p className="text-[10px] text-gray-500">{resident.mobile}</p>}
                                 {resident.joiningDate && (
                                   <p className="text-[10px] text-blue-600 flex items-center mt-0.5">
-                                    <span className='opacity-75 mr-1'>Joined:</span> {new Date(resident.joiningDate).toLocaleDateString()}
+                                    <span className='opacity-75 mr-1'>Entry:</span> {new Date(resident.joiningDate).toLocaleDateString()}
                                   </p>
                                 )}
                               </div>
@@ -527,6 +585,69 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
       </div>
 
       {/* --- Modals --- */}
+
+      {/* RENT REMINDERS POPUP */}
+      <BaseModal 
+        isOpen={modalType === 'DUE_REMINDERS'} 
+        onClose={() => setModalType(null)} 
+        title="🔔 Due Date Alerts"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 mb-2">
+            The following residents have rent due.
+          </p>
+          
+          {unpaidResidentsList.length === 0 ? (
+            <div className="text-center py-8 bg-green-50 rounded border border-green-100">
+               <CheckCircle className="mx-auto text-green-500 mb-2" size={32} />
+               <p className="text-green-800 font-medium">All clear! No pending payments.</p>
+            </div>
+          ) : (
+            <div className="max-h-[60vh] overflow-y-auto space-y-3">
+              {unpaidResidentsList.map(res => {
+                 const isOverdue = new Date() >= res.dueDate;
+                 const formattedDate = res.dueDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                 
+                 return (
+                  <div key={res.id} className={`p-3 rounded border ${isOverdue ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'} shadow-sm`}>
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-bold text-gray-800">{res.name}</h4>
+                        <p className="text-xs text-gray-500">Room {res.room} • ₹{res.amount}</p>
+                      </div>
+                      <div className="text-right">
+                         <span className={`text-xs font-bold px-2 py-1 rounded ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                           Due: {formattedDate}
+                         </span>
+                      </div>
+                    </div>
+                    {isOverdue && (
+                      <p className="text-xs text-red-600 font-medium mb-2 bg-red-100 p-1 rounded text-center">
+                        Your due date has passed. Please pay the rent.
+                      </p>
+                    )}
+                    {res.mobile ? (
+                      <Button 
+                        size="sm" 
+                        className="w-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center"
+                        onClick={() => sendPaymentReminder(res.mobile, res.name, res.dueDate)}
+                      >
+                        <Share2 size={16} className="mr-2" /> Send WhatsApp Reminder
+                      </Button>
+                    ) : (
+                      <div className="text-center text-xs text-gray-400 italic py-1">No mobile number</div>
+                    )}
+                  </div>
+                 );
+              })}
+            </div>
+          )}
+          
+          <div className="pt-2 border-t flex justify-end">
+            <Button variant="secondary" onClick={() => setModalType(null)}>Close</Button>
+          </div>
+        </div>
+      </BaseModal>
       
       <BaseModal 
         isOpen={modalType === 'ADD_FLOOR'} 
@@ -615,7 +736,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Joining Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date of Entry</label>
                 <div className="relative">
                   <input 
                     type="date" 
