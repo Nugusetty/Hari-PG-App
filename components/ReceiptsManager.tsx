@@ -3,7 +3,7 @@ import { Receipt, AppSettings } from '../types';
 import { Button } from './Button';
 import { ReceiptModal } from './ReceiptModal';
 import { BaseModal } from './BaseModal';
-import { Printer, Trash2, Edit2, Plus, Search, Share2 } from 'lucide-react';
+import { Printer, Trash2, Edit2, Plus, Search, Share2, Calculator } from 'lucide-react';
 
 interface ReceiptsManagerProps {
   receipts: Receipt[];
@@ -109,6 +109,9 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
     r.roomNumber.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Calculate Total Amount
+  const totalAmount = filteredReceipts.reduce((sum, receipt) => sum + receipt.amount, 0);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -118,18 +121,29 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search size={16} className="text-gray-400" />
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-end">
+        {/* Search */}
+        <div className="relative w-full md:w-auto flex-1">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search size={16} className="text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search by name or room..."
+            className="pl-10 w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-        <input
-          type="text"
-          placeholder="Search by name or room..."
-          className="pl-10 w-full md:w-80 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+
+        {/* Total Display */}
+        <div className="w-full md:w-auto bg-green-50 border border-green-200 rounded-lg px-4 py-2 shadow-sm flex items-center justify-between md:justify-start space-x-4">
+            <div className="flex items-center text-green-700">
+               <Calculator size={18} className="mr-2" />
+               <span className="text-sm font-medium">Total Collected</span>
+            </div>
+            <div className="text-xl font-bold text-green-800">₹{totalAmount.toLocaleString('en-IN')}</div>
+        </div>
       </div>
 
       {/* Table */}
