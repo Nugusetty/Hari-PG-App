@@ -2,13 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
     <meta name="theme-color" content="#1d4ed8" />
     <title>Hari PG Manager</title>
-    
+
     <!-- PWA Manifest -->
-    <link rel="manifest" href='data:application/manifest+json,{"name":"Hari PG Manager","short_name":"Hari PG","start_url":".","display":"standalone","background_color":"#f9fafb","theme_color":"#1d4ed8","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/619/619032.png","sizes":"512x512","type":"image/png"}]}' />
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/619/619032.png">
+    <link
+      rel="manifest"
+      href='data:application/manifest+json,{"name":"Hari PG Manager","short_name":"Hari PG","start_url":".","display":"standalone","background_color":"#f9fafb","theme_color":"#1d4ed8","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/619/619032.png","sizes":"512x512","type":"image/png"}]}'
+    />
+    <link
+      rel="apple-touch-icon"
+      href="https://cdn-icons-png.flaticon.com/512/619/619032.png"
+    />
 
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -16,7 +25,8 @@
         body * {
           visibility: hidden;
         }
-        .print-area, .print-area * {
+        .print-area,
+        .print-area * {
           visibility: visible;
         }
         .print-area {
@@ -36,22 +46,22 @@
         overscroll-behavior-y: none;
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.2",
-    "vite": "https://aistudiocdn.com/vite@^7.2.7"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://aistudiocdn.com/react@^19.2.1",
+          "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+          "react/": "https://aistudiocdn.com/react@^19.2.1/",
+          "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+          "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.2",
+          "vite": "https://aistudiocdn.com/vite@^7.2.7"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="/index.css" />
+  </head>
   <body>
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+    <script type="module" src="/index.tsx"></script>
+  </body>
 </html>
