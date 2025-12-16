@@ -24,12 +24,13 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose, se
     if (element) {
       try {
         // Generate image from the DOM element
+        // Cast options to 'any' because the @types/html2canvas definition might miss the 'scale' property
         const canvas = await html2canvas(element, { 
           scale: 2, // Higher resolution
           backgroundColor: '#ffffff',
           logging: false,
           useCORS: true 
-        });
+        } as any);
 
         // Convert canvas to blob
         canvas.toBlob(async (blob) => {
