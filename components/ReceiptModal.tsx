@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Receipt, AppSettings } from '../types';
 import { Button } from './Button';
-import { X, Printer, Share2, Download, Loader2 } from 'lucide-react';
+import { X, Printer, Share2, Loader2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface ReceiptModalProps {
@@ -42,9 +42,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose, se
           const file = new File([blob], fileName, { type: 'image/png' });
 
           // Check if the browser supports sharing files (Mobile/Tablet usually do)
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          // Type cast navigator to any to avoid TypeScript errors with canShare
+          const nav = navigator as any;
+          if (nav.canShare && nav.canShare({ files: [file] })) {
             try {
-              await navigator.share({
+              await nav.share({
                 files: [file],
                 title: 'Rent Receipt',
                 text: `Rent Receipt for ${receipt.residentName}`

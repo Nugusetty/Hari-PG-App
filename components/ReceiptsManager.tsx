@@ -3,7 +3,7 @@ import { Receipt, AppSettings } from '../types';
 import { Button } from './Button';
 import { ReceiptModal } from './ReceiptModal';
 import { BaseModal } from './BaseModal';
-import { Printer, Trash2, Edit2, Plus, Search, Share2, Calculator } from 'lucide-react';
+import { Trash2, Edit2, Plus, Search, Share2, Calculator } from 'lucide-react';
 
 interface ReceiptsManagerProps {
   receipts: Receipt[];
