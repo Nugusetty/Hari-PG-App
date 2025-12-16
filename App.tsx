@@ -3,8 +3,18 @@ import { Floor, Receipt, ViewState, AppSettings } from './types';
 import { Dashboard } from './components/Dashboard';
 import { ReceiptsManager } from './components/ReceiptsManager';
 import { BaseModal } from './components/BaseModal';
-import { LayoutDashboard, ReceiptText, Building2, Settings, Download, Upload, Trash2, Save, Smartphone, Github, QrCode, Link as LinkIcon, PenTool, Image as ImageIcon, Cloud, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, ReceiptText, Building2, Settings, Download, Upload, Trash2, Smartphone, Github, QrCode, Link as LinkIcon, PenTool, Image as ImageIcon, Cloud, RefreshCw, Save, Database, History } from 'lucide-react';
 import { Button } from './components/Button';
+
+// Helper to safely parse JSON
+const safeParse = (data: string | null, fallback: any) => {
+  if (!data) return fallback;
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return fallback;
+  }
+};
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ViewState>('dashboard');
@@ -19,11 +29,20 @@ const App: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
 
-  // Initialize settings
+  // Initialize settings with migration logic
   const [settings, setSettings] = useState<AppSettings>(() => {
-    // Changed key to ensure clean slate
-    const saved = localStorage.getItem('hari_pg_v2_settings');
-    return saved ? JSON.parse(saved) : {
+    // 1. Try Version 3
+    const v3 = localStorage.getItem('hari_pg_v3_settings');
+    if (v3) return safeParse(v3, {});
+
+    // 2. Try Legacy keys (migration)
+    const legacy = localStorage.getItem('hari_pg_settings');
+    if (legacy) return safeParse(legacy, {});
+
+    const legacyRaw = localStorage.getItem('settings');
+    if (legacyRaw) return safeParse(legacyRaw, {});
+
+    return {
       pgName: "Hari PG",
       pgSubtitle: "Luxury Men's Hostel & Accommodation",
       address: "29, PR Layout, Chandra Layout, Marathahalli, Bengaluru",
@@ -45,30 +64,48 @@ const App: React.FC = () => {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
   
-  // Initialize state from local storage or defaults
+  // Initialize state from local storage with Migration logic
   const [floors, setFloors] = useState<Floor[]>(() => {
-    // Changed key to ensure clean slate (removes old data like 'Rajesh')
-    const saved = localStorage.getItem('hari_pg_v2_floors');
-    return saved ? JSON.parse(saved) : [];
+    // 1. Try Version 3
+    const v3 = localStorage.getItem('hari_pg_v3_floors');
+    if (v3) return safeParse(v3, []);
+
+    // 2. Try Legacy keys (migration)
+    const legacy = localStorage.getItem('hari_pg_floors');
+    if (legacy) return safeParse(legacy, []);
+
+    const legacyRaw = localStorage.getItem('floors');
+    if (legacyRaw) return safeParse(legacyRaw, []);
+
+    return [];
   });
 
   const [receipts, setReceipts] = useState<Receipt[]>(() => {
-    // Changed key to ensure clean slate (removes old data like 'Rajesh')
-    const saved = localStorage.getItem('hari_pg_v2_receipts');
-    return saved ? JSON.parse(saved) : [];
+    // 1. Try Version 3
+    const v3 = localStorage.getItem('hari_pg_v3_receipts');
+    if (v3) return safeParse(v3, []);
+
+    // 2. Try Legacy keys (migration)
+    const legacy = localStorage.getItem('hari_pg_receipts');
+    if (legacy) return safeParse(legacy, []);
+    
+    const legacyRaw = localStorage.getItem('receipts');
+    if (legacyRaw) return safeParse(legacyRaw, []);
+
+    return [];
   });
 
   // Persistence with new keys
   useEffect(() => {
-    localStorage.setItem('hari_pg_v2_floors', JSON.stringify(floors));
+    localStorage.setItem('hari_pg_v3_floors', JSON.stringify(floors));
   }, [floors]);
 
   useEffect(() => {
-    localStorage.setItem('hari_pg_v2_receipts', JSON.stringify(receipts));
+    localStorage.setItem('hari_pg_v3_receipts', JSON.stringify(receipts));
   }, [receipts]);
 
   useEffect(() => {
-    localStorage.setItem('hari_pg_v2_settings', JSON.stringify(settings));
+    localStorage.setItem('hari_pg_v3_settings', JSON.stringify(settings));
   }, [settings]);
 
   // --- Handlers ---
@@ -247,10 +284,41 @@ const App: React.FC = () => {
     if (confirmText === 'DELETE') {
       setFloors([]);
       setReceipts([]);
-      localStorage.removeItem('hari_pg_v2_floors');
-      localStorage.removeItem('hari_pg_v2_receipts');
+      localStorage.removeItem('hari_pg_v3_floors');
+      localStorage.removeItem('hari_pg_v3_receipts');
+      localStorage.removeItem('hari_pg_floors'); // Clean legacy
+      localStorage.removeItem('hari_pg_receipts'); // Clean legacy
       alert("App data has been reset.");
       setIsSettingsOpen(false);
+    }
+  };
+
+  const attemptLegacyRecovery = () => {
+    if (!confirm("This will attempt to find data from older versions of the app and OVERWRITE current data. Continue?")) return;
+    
+    // Check various legacy keys
+    const legacyFloors = localStorage.getItem('hari_pg_floors') || localStorage.getItem('floors');
+    const legacyReceipts = localStorage.getItem('hari_pg_receipts') || localStorage.getItem('receipts');
+    
+    let recovered = 0;
+    if (legacyFloors) {
+      try {
+        setFloors(JSON.parse(legacyFloors));
+        recovered++;
+      } catch(e) {}
+    }
+    
+    if (legacyReceipts) {
+      try {
+        setReceipts(JSON.parse(legacyReceipts));
+        recovered++;
+      } catch(e) {}
+    }
+
+    if (recovered > 0) {
+      alert("Legacy data found and restored! Please check your Dashboard.");
+    } else {
+      alert("No legacy data found in this browser.");
     }
   };
 
@@ -587,6 +655,24 @@ const App: React.FC = () => {
                 <Upload size={14} className="mr-2" /> Restore File
               </Button>
             </div>
+          </div>
+
+          {/* Emergency Recovery */}
+          <div className="space-y-4 pt-4 border-t border-dashed">
+            <h4 className="font-medium text-orange-800 flex items-center text-sm">
+              <History size={16} className="mr-2" /> Legacy Data Recovery
+            </h4>
+            <div className="bg-orange-50 p-3 rounded text-xs text-orange-800 mb-2">
+              If your data is missing after an update, click below to search for data from the previous version of the app.
+            </div>
+            <Button 
+               variant="secondary" 
+               size="sm"
+               className="w-full border border-orange-200 text-orange-800 hover:bg-orange-100"
+               onClick={attemptLegacyRecovery}
+            >
+              <Database size={14} className="mr-2" /> Attempt Legacy Recovery
+            </Button>
           </div>
 
           {/* Danger Zone */}
