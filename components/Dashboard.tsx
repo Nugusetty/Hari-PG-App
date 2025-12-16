@@ -8,12 +8,11 @@ interface DashboardProps {
   floors: Floor[];
   setFloors: React.Dispatch<React.SetStateAction<Floor[]>>;
   receipts: Receipt[];
-  setReceipts: React.Dispatch<React.SetStateAction<Receipt[]>>;
 }
 
 type ModalType = 'ADD_FLOOR' | 'ADD_ROOM' | 'RESIDENT_MODAL' | 'DUE_REMINDERS';
 
-export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipts, setReceipts }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipts }) => {
   const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
   
   // Modal State initialized to null so it doesn't open automatically

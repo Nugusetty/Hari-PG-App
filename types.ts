@@ -36,6 +36,9 @@ export interface AppSettings {
   address: string;
   phone: string;
   signatureImage?: string;
+  // Cloud Sync Keys
+  jsonBinSecret?: string; // X-Master-Key
+  jsonBinId?: string;     // Bin ID
 }
 
 export type ViewState = 'dashboard' | 'receipts';

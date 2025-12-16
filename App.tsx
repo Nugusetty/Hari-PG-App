@@ -3,7 +3,7 @@ import { Floor, Receipt, ViewState, AppSettings } from './types';
 import { Dashboard } from './components/Dashboard';
 import { ReceiptsManager } from './components/ReceiptsManager';
 import { BaseModal } from './components/BaseModal';
-import { LayoutDashboard, ReceiptText, Building2, Settings, Download, Upload, Trash2, Save, Smartphone, Github, QrCode, Link as LinkIcon, PenTool, Image as ImageIcon } from 'lucide-react';
+import { LayoutDashboard, ReceiptText, Building2, Settings, Download, Upload, Trash2, Save, Smartphone, Github, QrCode, Link as LinkIcon, PenTool, Image as ImageIcon, Cloud, RefreshCw } from 'lucide-react';
 import { Button } from './components/Button';
 
 const App: React.FC = () => {
@@ -11,12 +11,24 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [customQrUrl, setCustomQrUrl] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
   
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
+
+  // Initialize settings
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    const saved = localStorage.getItem('hari_pg_settings');
+    return saved ? JSON.parse(saved) : {
+      pgName: "Hari PG",
+      pgSubtitle: "Luxury Men's Hostel & Accommodation",
+      address: "29, PR Layout, Chandra Layout, Marathahalli, Bengaluru",
+      phone: "+91 9010646051"
+    };
+  });
 
   // Capture the PWA install prompt & Get URL
   useEffect(() => {
@@ -41,16 +53,6 @@ const App: React.FC = () => {
   const [receipts, setReceipts] = useState<Receipt[]>(() => {
     const saved = localStorage.getItem('hari_pg_receipts');
     return saved ? JSON.parse(saved) : [];
-  });
-
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('hari_pg_settings');
-    return saved ? JSON.parse(saved) : {
-      pgName: "Hari PG",
-      pgSubtitle: "Luxury Men's Hostel & Accommodation",
-      address: "29, PR Layout, Chandra Layout, Marathahalli, Bengaluru",
-      phone: "+91 9010646051"
-    };
   });
 
   // Persistence
@@ -129,11 +131,96 @@ const App: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // --- CLOUD SYNC LOGIC ---
+  const handleCloudUpload = async () => {
+    if (!settings.jsonBinId || !settings.jsonBinSecret) {
+      alert("Please enter Bin ID and API Key to sync.");
+      return;
+    }
+
+    if (!confirm("Overwrite cloud data with current phone data?")) {
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const data = {
+        floors,
+        receipts,
+        settings, // Include settings in backup
+        updatedAt: new Date().toISOString()
+      };
+
+      const response = await fetch(`https://api.jsonbin.io/v3/b/${settings.jsonBinId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': settings.jsonBinSecret
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) throw new Error("Upload failed");
+      
+      alert("✅ Upload Successful! Data is saved to cloud.");
+    } catch (error) {
+      console.error(error);
+      alert("❌ Upload Failed. Check internet connection and keys.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleCloudDownload = async () => {
+    if (!settings.jsonBinId || !settings.jsonBinSecret) {
+      alert("Please enter Bin ID and API Key to sync.");
+      return;
+    }
+
+    if (!confirm("Replace phone data with cloud data?")) {
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const response = await fetch(`https://api.jsonbin.io/v3/b/${settings.jsonBinId}/latest`, {
+        method: 'GET',
+        headers: {
+          'X-Master-Key': settings.jsonBinSecret
+        }
+      });
+
+      if (!response.ok) throw new Error("Download failed");
+
+      const result = await response.json();
+      const data = result.record;
+
+      if (data.floors) setFloors(data.floors);
+      if (data.receipts) setReceipts(data.receipts);
+      
+      // Also sync settings if available, but be careful not to wipe keys if they are missing in cloud
+      if (data.settings) {
+        setSettings(prev => ({
+            ...data.settings,
+            jsonBinId: prev.jsonBinId, // Keep local keys
+            jsonBinSecret: prev.jsonBinSecret
+        }));
+      }
+
+      alert(`✅ Data Synced! Loaded data from ${new Date(data.updatedAt || Date.now()).toLocaleDateString()}`);
+      setIsSettingsOpen(false);
+    } catch (error) {
+      console.error(error);
+      alert("❌ Download Failed. Check internet connection and keys.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleSignatureUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Limit size to 500KB to prevent localStorage quota issues
     if (file.size > 500000) {
       alert("Image is too large. Please upload an image smaller than 500KB.");
       return;
@@ -157,7 +244,6 @@ const App: React.FC = () => {
     if (confirmText === 'DELETE') {
       setFloors([]);
       setReceipts([]);
-      // We don't delete settings to keep PG name configuration
       localStorage.removeItem('hari_pg_floors');
       localStorage.removeItem('hari_pg_receipts');
       alert("App data has been reset.");
@@ -165,6 +251,7 @@ const App: React.FC = () => {
     }
   };
 
+  // --- RENDER MAIN APP ---
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
       {/* Navbar */}
@@ -339,6 +426,62 @@ const App: React.FC = () => {
       >
         <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
           
+          {/* Account/Sync Section */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+             <div className="flex justify-between items-center">
+               <h4 className="font-bold text-blue-800 flex items-center">
+                  <Cloud size={20} className="mr-2" /> Cloud Backup (JsonBin)
+               </h4>
+             </div>
+             
+             <div className="space-y-2">
+                <div>
+                   <label className="text-[10px] text-gray-500 uppercase font-bold">Bin ID</label>
+                   <input 
+                      type="text" 
+                      placeholder="e.g. 65e8f..."
+                      className="w-full border border-gray-300 rounded px-2 py-1 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      value={settings.jsonBinId || ''}
+                      onChange={(e) => setSettings({...settings, jsonBinId: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="text-[10px] text-gray-500 uppercase font-bold">Master API Key</label>
+                   <div className="relative">
+                     <input 
+                        type="password" 
+                        placeholder="••••••••••••••••"
+                        className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        value={settings.jsonBinSecret || ''}
+                        onChange={(e) => setSettings({...settings, jsonBinSecret: e.target.value})}
+                     />
+                   </div>
+                </div>
+             </div>
+
+             <div className="flex space-x-2 pt-1">
+                <Button 
+                   size="sm" 
+                   onClick={handleCloudUpload} 
+                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                   disabled={isSyncing}
+                >
+                  {isSyncing ? <RefreshCw className="animate-spin h-3 w-3 mr-1" /> : <Upload size={14} className="mr-1" />}
+                  Upload
+                </Button>
+                <Button 
+                   size="sm" 
+                   variant="secondary"
+                   onClick={handleCloudDownload} 
+                   className="flex-1 bg-white border border-blue-200 text-blue-800 hover:bg-blue-50 text-xs"
+                   disabled={isSyncing}
+                >
+                  {isSyncing ? <RefreshCw className="animate-spin h-3 w-3 mr-1" /> : <Download size={14} className="mr-1" />}
+                  Download
+                </Button>
+             </div>
+          </div>
+
           {/* PG Details Section */}
           <div className="space-y-4">
             <h4 className="font-medium text-gray-800 flex items-center border-b pb-2">
@@ -419,11 +562,11 @@ const App: React.FC = () => {
           {/* Backup Section */}
           <div className="space-y-4 pt-4 border-t">
             <h4 className="font-medium text-blue-800 flex items-center">
-              <Save size={18} className="mr-2" /> Backup & Restore
+              <Save size={18} className="mr-2" /> Local Backup & Restore
             </h4>
             <div className="flex space-x-2">
               <Button onClick={handleDownloadData} size="sm" className="flex-1">
-                <Download size={14} className="mr-2" /> Backup
+                <Download size={14} className="mr-2" /> Backup File
               </Button>
               <input
                 type="file"
@@ -438,7 +581,7 @@ const App: React.FC = () => {
                 className="flex-1"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Upload size={14} className="mr-2" /> Restore
+                <Upload size={14} className="mr-2" /> Restore File
               </Button>
             </div>
           </div>
