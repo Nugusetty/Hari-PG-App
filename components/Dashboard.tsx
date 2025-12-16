@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Floor, Resident, Receipt } from '../types';
 import { Button } from './Button';
 import { BaseModal } from './BaseModal';
-import { Plus, Trash2, User, Home, ChevronDown, ChevronRight, UserPlus, Phone, Edit2, Calendar, CheckCircle, XCircle, AlertCircle, Share2, Eye, EyeOff, Clock, Bell } from 'lucide-react';
+import { Plus, Trash2, User, Home, ChevronDown, ChevronRight, UserPlus, Phone, Edit2, Calendar, CheckCircle, XCircle, AlertCircle, Share2, Eye, EyeOff, Clock, Bell, CheckSquare, MessageCircle } from 'lucide-react';
 
 interface DashboardProps {
   floors: Floor[];
   setFloors: React.Dispatch<React.SetStateAction<Floor[]>>;
   receipts: Receipt[];
+  setReceipts: React.Dispatch<React.SetStateAction<Receipt[]>>;
 }
 
 type ModalType = 'ADD_FLOOR' | 'ADD_ROOM' | 'RESIDENT_MODAL' | 'DUE_REMINDERS';
 
-export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipts }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipts, setReceipts }) => {
   const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
   const [showUnpaidList, setShowUnpaidList] = useState(false);
   
@@ -36,11 +37,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
   
   // We need to calculate status for every resident
   const unpaidResidentsList: {
+    id: string,
+    floorId: string,
+    roomId: string,
     name: string, 
     room: string, 
     amount: number, 
     mobile: string, 
-    id: string,
     lastPaidDate?: string,
     dueDate: Date
   }[] = [];
@@ -111,6 +114,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
            
            unpaidResidentsList.push({
              id: resident.id,
+             floorId: floor.id,
+             roomId: room.id,
              name: resident.name,
              room: room.roomNumber,
              amount: resident.rentAmount,
@@ -335,6 +340,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     // WhatsApp format often needs to be conversational
     const text = `Hello ${name}, your rent due date ${formattedDate} has passed. Please pay the rent.`;
     window.open(`https://wa.me/91${mobile.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  // NEW: Handle "Paid" action
+  const handleMarkPaid = (resident: typeof unpaidResidentsList[0]) => {
+     if (!confirm(`Mark rent as PAID for ${resident.name}? This will create a receipt for ₹${resident.amount}.`)) {
+       return;
+     }
+
+     const newReceipt: Receipt = {
+        id: Date.now().toString(),
+        residentName: resident.name,
+        roomNumber: resident.room,
+        mobileNumber: resident.mobile,
+        amount: resident.amount,
+        date: new Date().toISOString().split('T')[0],
+        paymentMethod: 'Cash', 
+        notes: 'Marked as Paid from Dashboard Alert'
+     };
+     
+     setReceipts(prev => [newReceipt, ...prev]);
   };
 
   return (
@@ -622,21 +647,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                       </div>
                     </div>
                     {isOverdue && (
-                      <p className="text-xs text-red-600 font-medium mb-2 bg-red-100 p-1 rounded text-center">
+                      <p className="text-xs text-red-600 font-medium mb-3 bg-red-100 p-1 rounded text-center">
                         Your due date has passed. Please pay the rent.
                       </p>
                     )}
-                    {res.mobile ? (
-                      <Button 
-                        size="sm" 
-                        className="w-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center"
-                        onClick={() => sendPaymentReminder(res.mobile, res.name, res.dueDate)}
-                      >
-                        <Share2 size={16} className="mr-2" /> Send WhatsApp Reminder
-                      </Button>
-                    ) : (
-                      <div className="text-center text-xs text-gray-400 italic py-1">No mobile number</div>
-                    )}
+                    
+                    {/* ACTION BUTTONS */}
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                       <Button 
+                         size="sm" 
+                         variant="danger"
+                         className="flex items-center justify-center text-xs"
+                         onClick={() => deleteResident(res.floorId, res.roomId, res.id)}
+                       >
+                         <Trash2 size={14} className="mr-1" /> Delete
+                       </Button>
+
+                       {res.mobile ? (
+                        <Button 
+                          size="sm" 
+                          className="flex items-center justify-center bg-green-600 hover:bg-green-700 text-white text-xs"
+                          onClick={() => sendPaymentReminder(res.mobile, res.name, res.dueDate)}
+                        >
+                          <Share2 size={14} className="mr-1" /> Share
+                        </Button>
+                       ) : (
+                        <Button size="sm" variant="secondary" disabled className="text-xs opacity-50">
+                          No #
+                        </Button>
+                       )}
+                    </div>
+
                   </div>
                  );
               })}
