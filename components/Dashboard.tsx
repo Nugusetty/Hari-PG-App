@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Floor, Resident, Receipt } from '../types';
 import { Button } from './Button';
 import { BaseModal } from './BaseModal';
-import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Calendar, CheckCircle, Bell, Share2, Eye,} from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Calendar, CheckCircle, Bell, Share2, Eye, } from 'lucide-react';
 
 interface DashboardProps {
   floors: Floor[];
@@ -81,7 +81,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
         if (dismissedAlerts[resident.id] === dateToken) return;
 
         // STRICT LOGIC: Only show alert if the due date is TODAY or in the PAST.
-        // Future dates (like tomorrow) are strictly excluded.
         const isPastOrToday = nextDueDate <= today;
 
         if (isPastOrToday) {
@@ -279,6 +278,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                           <div className="truncate flex-1">
                             <p className="font-bold text-gray-800 truncate">{resident.name}</p>
                             <p className="text-[10px] text-gray-500">{resident.mobile}</p>
+                            {resident.joiningDate && (
+                              <p className="text-[9px] text-blue-500 font-medium mt-0.5">Joined: {new Date(resident.joiningDate).toLocaleDateString('en-GB')}</p>
+                            )}
                           </div>
                           <div className="flex space-x-1">
                             <button onClick={() => openResidentModal(floor.id, room.id, resident)} className="p-1 text-blue-500"><Edit2 size={14} /></button>
@@ -314,7 +316,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {/* Replaced Icon with explicit "Remove" Button */}
                     <button
                       onClick={() => { if (confirm("Dismiss this alert?")) setDismissedAlerts({ ...dismissedAlerts, [res.id]: res.dueDate.toDateString() }); }}
                       className="px-3 py-1.5 text-xs font-bold text-gray-400 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex items-center"
