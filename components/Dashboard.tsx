@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Floor, Resident, Receipt } from '../types';
 import { Button } from './Button';
 import { BaseModal } from './BaseModal';
-import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Calendar, CheckCircle, Bell, Share2, Eye, } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Calendar, CheckCircle, Bell, Share2, Eye, X, Phone, Search } from 'lucide-react';
 
 interface DashboardProps {
   floors: Floor[];
@@ -15,6 +15,7 @@ type ModalType = 'ADD_FLOOR' | 'ADD_ROOM' | 'RESIDENT_MODAL' | 'DUE_REMINDERS';
 export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipts }) => {
   const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
   const [modalType, setModalType] = useState<ModalType | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -51,8 +52,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     room: string,
     amount: number,
     mobile: string,
-    lastPaidDate?: string,
-    dueDate: Date
+    dueDate: Date,
+    dueMonthName: string
   }[] = [];
 
   floors.forEach(floor => {
@@ -62,39 +63,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
           r.residentName.trim().toLowerCase() === resident.name.trim().toLowerCase()
         );
 
-        residentReceipts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        const lastReceipt = residentReceipts[0];
+        let checkDate = resident.joiningDate ? new Date(resident.joiningDate) : new Date();
+        checkDate.setHours(0, 0, 0, 0);
 
-        let nextDueDate: Date;
-        if (lastReceipt) {
-          const lastPaidDate = new Date(lastReceipt.date);
-          nextDueDate = new Date(lastPaidDate);
-          nextDueDate.setMonth(lastPaidDate.getMonth() + 1);
-        } else if (resident.joiningDate) {
-          nextDueDate = new Date(resident.joiningDate);
-        } else {
-          nextDueDate = new Date();
-        }
-        nextDueDate.setHours(0, 0, 0, 0);
+        let foundUnpaid = false;
+        const maxSafetyIterations = 48;
+        let iterations = 0;
 
-        const dateToken = nextDueDate.toDateString();
-        if (dismissedAlerts[resident.id] === dateToken) return;
-
-        // STRICT LOGIC: Only show alert if the due date is TODAY or in the PAST.
-        const isPastOrToday = nextDueDate <= today;
-
-        if (isPastOrToday) {
-          unpaidResidentsList.push({
-            id: resident.id,
-            floorId: floor.id,
-            roomId: room.id,
-            name: resident.name,
-            room: room.roomNumber,
-            amount: resident.rentAmount,
-            mobile: resident.mobile,
-            lastPaidDate: lastReceipt ? lastReceipt.date : undefined,
-            dueDate: nextDueDate
+        while (!foundUnpaid && iterations < maxSafetyIterations) {
+          iterations++;
+          const hasReceiptForMonth = residentReceipts.some(receipt => {
+            const rDate = new Date(receipt.date);
+            return rDate.getMonth() === checkDate.getMonth() && rDate.getFullYear() === checkDate.getFullYear();
           });
+
+          if (!hasReceiptForMonth) {
+            if (checkDate <= today) {
+              const dateToken = checkDate.toDateString();
+              if (dismissedAlerts[resident.id] !== dateToken) {
+                unpaidResidentsList.push({
+                  id: resident.id,
+                  floorId: floor.id,
+                  roomId: room.id,
+                  name: resident.name,
+                  room: room.roomNumber,
+                  amount: resident.rentAmount,
+                  mobile: resident.mobile,
+                  dueDate: new Date(checkDate),
+                  dueMonthName: `${monthNames[checkDate.getMonth()]} ${checkDate.getFullYear()}`
+                });
+              }
+            }
+            foundUnpaid = true;
+          } else {
+            checkDate.setMonth(checkDate.getMonth() + 1);
+            if (checkDate > today) break;
+          }
         }
       });
     });
@@ -189,11 +193,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     }));
   };
 
-  const sendPaymentReminder = (mobile: string, name: string, dueDate: Date) => {
-    const formattedDate = dueDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
-    const text = `Hello ${name}, your rent for this month (due on ${formattedDate}) is pending. Please process the payment at your earliest. Thank you!`;
+  const handleCall = (mobile: string) => {
+    const cleanMobile = mobile.replace(/\D/g, '');
+    if (cleanMobile) {
+      window.location.href = `tel:${cleanMobile}`;
+    } else {
+      alert("No valid mobile number provided.");
+    }
+  };
+
+  const sendPaymentReminder = (mobile: string, name: string, dueDate: Date, monthName: string) => {
+    const text = `Hello ${name}, your rent for ${monthName} (due since ${dueDate.toLocaleDateString('en-GB')}) is pending. Please process the payment at your earliest. Thank you!`;
     window.open(`https://wa.me/91${mobile.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank');
   };
+
+  // Filter Logic for Floors and Rooms based on Search Term
+  const filteredFloors = floors.map(floor => {
+    const filteredRooms = floor.rooms.filter(room => {
+      const matchesRoom = room.roomNumber.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesResident = room.residents.some(res => res.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesRoom || matchesResident;
+    });
+    return { ...floor, rooms: filteredRooms };
+  }).filter(floor => floor.rooms.length > 0 || floor.floorNumber.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="space-y-6">
@@ -201,7 +223,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
         <div className="flex justify-between items-start mb-4">
           <h2 className="text-lg font-semibold text-gray-800 flex items-center">
             <Calendar size={20} className="mr-2 text-blue-600" />
-            Payment Status: {monthNames[currentMonth]} {currentYear}
+            Rent Tracker: {monthNames[currentMonth]} {currentYear}
           </h2>
           <button onClick={() => setModalType('DUE_REMINDERS')} className="relative p-2 text-gray-500 hover:text-blue-600 transition-colors">
             <Bell size={22} />
@@ -227,10 +249,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
             </div>
           </div>
 
-          <div className="bg-red-50 p-3 rounded-md border border-red-100 flex flex-col justify-between h-24 relative">
+          <div className="bg-red-50 p-3 rounded-md border border-red-100 flex flex-col justify-between h-24 relative cursor-pointer" onClick={() => setModalType('DUE_REMINDERS')}>
             <div className="flex justify-between items-start">
-              <p className="text-xs text-red-600 uppercase font-semibold flex items-center">Today's Alerts</p>
-              <button onClick={() => setModalType('DUE_REMINDERS')} className="text-red-400 hover:text-red-600"><Eye size={16} /></button>
+              <p className="text-xs text-red-600 uppercase font-semibold flex items-center">Pending Alerts</p>
+              <Eye size={16} className="text-red-400" />
             </div>
             <div>
               <span className="text-3xl font-bold text-gray-800">{unpaidCount}</span>
@@ -245,17 +267,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
         </div>
       </div>
 
+      {/* Global Search Bar */}
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Search size={18} className="text-gray-400" />
+        </div>
+        <input
+          type="text"
+          placeholder="Search Room Number or Resident Name..."
+          className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm transition-all"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        {searchTerm && (
+          <button onClick={() => setSearchTerm('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
       <div className="flex justify-between items-center mt-8">
         <h2 className="text-xl font-semibold text-gray-800">Management</h2>
         <Button onClick={() => setModalType('ADD_FLOOR')} size="sm"><Plus size={16} className="mr-2" /> Add Floor</Button>
       </div>
 
       <div className="space-y-4">
-        {floors.map(floor => (
+        {filteredFloors.map(floor => (
           <div key={floor.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer" onClick={() => toggleFloor(floor.id)}>
               <div className="flex items-center space-x-2">
-                {expandedFloors.has(floor.id) ? <ChevronDown size={20} className="text-gray-500" /> : <ChevronRight size={20} className="text-gray-500" />}
+                {(expandedFloors.has(floor.id) || searchTerm) ? <ChevronDown size={20} className="text-gray-500" /> : <ChevronRight size={20} className="text-gray-500" />}
                 <h3 className="font-semibold text-lg text-gray-800 uppercase">{floor.floorNumber}</h3>
               </div>
               <div className="flex items-center space-x-2">
@@ -264,7 +305,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
               </div>
             </div>
 
-            {expandedFloors.has(floor.id) && (
+            {(expandedFloors.has(floor.id) || searchTerm) && (
               <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-white">
                 {floor.rooms.map(room => (
                   <div key={room.id} className="border border-gray-200 rounded-md p-3">
@@ -274,7 +315,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                     </div>
                     <div className="space-y-2">
                       {room.residents.map(resident => (
-                        <div key={resident.id} className="flex justify-between items-center text-xs bg-gray-50 p-2 rounded">
+                        <div key={resident.id} className="flex justify-between items-center text-xs bg-gray-50 p-2 rounded shadow-sm border border-gray-100">
                           <div className="truncate flex-1">
                             <p className="font-bold text-gray-800 truncate">{resident.name}</p>
                             <p className="text-[10px] text-gray-500">{resident.mobile}</p>
@@ -282,9 +323,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                               <p className="text-[9px] text-blue-500 font-medium mt-0.5">Joined: {new Date(resident.joiningDate).toLocaleDateString('en-GB')}</p>
                             )}
                           </div>
-                          <div className="flex space-x-1">
-                            <button onClick={() => openResidentModal(floor.id, room.id, resident)} className="p-1 text-blue-500"><Edit2 size={14} /></button>
-                            <button onClick={() => deleteResident(floor.id, room.id, resident.id)} className="p-1 text-red-300"><Trash2 size={14} /></button>
+                          <div className="flex space-x-0.5 items-center">
+                            <button
+                              onClick={() => handleCall(resident.mobile)}
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-full transition-colors"
+                              title="Call Resident"
+                            >
+                              <Phone size={16} />
+                            </button>
+                            <button
+                              onClick={() => openResidentModal(floor.id, room.id, resident)}
+                              className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-full transition-colors"
+                              title="Edit Info"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => deleteResident(floor.id, room.id, resident.id)}
+                              className="p-1.5 text-red-400 hover:bg-red-50 rounded-full transition-colors"
+                              title="Remove Resident"
+                            >
+                              <Trash2 size={16} />
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -296,34 +356,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
             )}
           </div>
         ))}
+        {filteredFloors.length === 0 && searchTerm && (
+          <div className="text-center py-10 bg-white rounded-lg border border-dashed">
+            <p className="text-gray-500">No rooms or residents found matching "{searchTerm}"</p>
+          </div>
+        )}
       </div>
 
-      <BaseModal isOpen={modalType === 'DUE_REMINDERS'} onClose={() => setModalType(null)} title="🔔 Rent Alerts">
+      <BaseModal isOpen={modalType === 'DUE_REMINDERS'} onClose={() => setModalType(null)} title="🔔 Rent Alerts (Auto-Calculated)">
         <div className="space-y-4">
-          <p className="text-xs text-gray-500 font-medium px-1">Payments due as of today:</p>
+          <p className="text-xs text-gray-500 font-medium px-1">The system automatically detects missing rent months:</p>
           {unpaidResidentsList.length === 0 ? (
-            <div className="text-center py-8"><CheckCircle className="mx-auto text-green-500 mb-2" size={32} /><p className="text-gray-500">No pending payments for today.</p></div>
+            <div className="text-center py-8"><CheckCircle className="mx-auto text-green-500 mb-2" size={32} /><p className="text-gray-500">All residents are up to date!</p></div>
           ) : (
             <div className="max-h-[60vh] overflow-y-auto space-y-3 px-1">
               {unpaidResidentsList.map(res => (
                 <div key={res.id} className="p-4 rounded-xl border bg-white border-gray-200 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all">
                   <div className="flex-1">
                     <h4 className="font-bold text-gray-900 text-base">{res.name}</h4>
-                    <p className="text-xs text-gray-500 flex items-center mt-1">
-                      Room {res.room} • Due: <span className={`ml-1 font-bold ${res.dueDate < today ? 'text-red-600' : 'text-blue-600'}`}>
-                        {res.dueDate.toLocaleDateString('en-GB')}
-                      </span>
+                    <p className="text-xs text-red-600 font-bold uppercase tracking-tighter mt-0.5">{res.dueMonthName} Rent Pending</p>
+                    <p className="text-[10px] text-gray-500 flex items-center mt-1">
+                      Room {res.room} • Due: {res.dueDate.toLocaleDateString('en-GB')}
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => { if (confirm("Dismiss this alert?")) setDismissedAlerts({ ...dismissedAlerts, [res.id]: res.dueDate.toDateString() }); }}
+                      onClick={() => { if (confirm("Dismiss this alert for this month?")) setDismissedAlerts({ ...dismissedAlerts, [res.id]: res.dueDate.toDateString() }); }}
                       className="px-3 py-1.5 text-xs font-bold text-gray-400 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex items-center"
                     >
                       Remove
                     </button>
                     <button
-                      onClick={() => sendPaymentReminder(res.mobile, res.name, res.dueDate)}
+                      onClick={() => sendPaymentReminder(res.mobile, res.name, res.dueDate, res.dueMonthName)}
                       className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm transition-all flex items-center justify-center"
                       title="Share Reminder"
                     >
