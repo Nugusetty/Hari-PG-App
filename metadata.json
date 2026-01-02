@@ -1,5 +1,5 @@
 {
-  "name": "Copy of Hari PG APP",
-  "description": "A comprehensive Paying Guest (PG) management application to track floors, rooms, residents, and manage rent receipts with print functionality.",
+  "name": "Hari PG Manager",
+  "description": "Professional Paying Guest (PG) management application with resident tracking, rent receipts, and cloud backup capabilities.",
   "requestFramePermissions": []
 }

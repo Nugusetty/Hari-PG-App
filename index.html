@@ -1,23 +1,19 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
-    />
-    <meta name="theme-color" content="#1d4ed8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#1e40af" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="description" content="Hari PG Manager - Professional management for Paying Guest accommodations." />
     <title>Hari PG Manager</title>
-
+    
     <!-- PWA Manifest -->
-    <link
-      rel="manifest"
-      href='data:application/manifest+json,{"name":"Hari PG Manager","short_name":"Hari PG","start_url":".","display":"standalone","background_color":"#f9fafb","theme_color":"#1d4ed8","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/619/619032.png","sizes":"512x512","type":"image/png"}]}'
-    />
-    <link
-      rel="apple-touch-icon"
-      href="https://cdn-icons-png.flaticon.com/512/619/619032.png"
-    />
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Hari PG Manager","short_name":"Hari PG","start_url":"/","display":"standalone","background_color":"#ffffff","theme_color":"#1e40af","description":"Professional PG management system","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/619/619032.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}' />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/619/619032.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -25,8 +21,7 @@
         body * {
           visibility: hidden;
         }
-        .print-area,
-        .print-area * {
+        .print-area, .print-area * {
           visibility: visible;
         }
         .print-area {
@@ -41,27 +36,43 @@
           display: none !important;
         }
       }
-      /* Prevent pull-to-refresh on mobile for app-like feel */
       body {
-        overscroll-behavior-y: none;
+        overscroll-behavior-y: contain;
+        background-color: #f9fafb;
+        -webkit-tap-highlight-color: transparent;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       }
+      /* Safe area padding for newer mobile devices */
+      .safe-top { padding-top: env(safe-area-inset-top); }
+      .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
     </style>
-    <script type="importmap">
-      {
-        "imports": {
-          "react": "https://aistudiocdn.com/react@^19.2.1",
-          "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-          "react/": "https://aistudiocdn.com/react@^19.2.1/",
-          "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-          "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.2",
-          "vite": "https://aistudiocdn.com/vite@^7.2.7",
-          "html2canvas": "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm"
-        }
-      }
-    </script>
-  </head>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.2",
+    "vite": "https://aistudiocdn.com/vite@^7.2.7",
+    "html2canvas": "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm"
+  }
+}
+</script>
+</head>
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log('Service Worker Registered');
+          }).catch(err => {
+            console.log('Service Worker Registration failed', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>
