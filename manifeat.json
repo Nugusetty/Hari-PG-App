@@ -1,0 +1,40 @@
+{
+    "name": "Hari PG Manager",
+    "short_name": "Hari PG",
+    "description": "Professional Paying Guest (PG) management application for tracking residents and generating receipts.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#1e40af",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "https://cdn-icons-png.flaticon.com/512/619/619032.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "https://cdn-icons-png.flaticon.com/512/619/619032.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "https://cdn-icons-png.flaticon.com/512/619/619032.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "Homescreen"
+        },
+        {
+            "src": "https://cdn-icons-png.flaticon.com/512/619/619032.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Homescreen"
+        }
+    ]
+}

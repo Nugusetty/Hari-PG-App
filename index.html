@@ -5,14 +5,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#1e40af" />
+    
+    <!-- PWA Primary Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Hari PG">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="description" content="Hari PG Manager - Professional management for Paying Guest accommodations." />
     <title>Hari PG Manager</title>
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href='data:application/manifest+json,{"name":"Hari PG Manager","short_name":"Hari PG","start_url":"/","display":"standalone","background_color":"#ffffff","theme_color":"#1e40af","description":"Professional PG management system","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/619/619032.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}' />
+    <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/619/619032.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -67,7 +70,7 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').then(reg => {
-            console.log('Service Worker Registered');
+            console.log('Service Worker Registered Successfully');
           }).catch(err => {
             console.log('Service Worker Registration failed', err);
           });
