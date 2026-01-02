@@ -387,6 +387,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                       Remove
                     </button>
                     <button
+                      onClick={() => handleCall(res.mobile)}
+                      className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm transition-all flex items-center justify-center"
+                      title="Call Resident"
+                    >
+                      <Phone size={18} />
+                    </button>
+                    <button
                       onClick={() => sendPaymentReminder(res.mobile, res.name, res.dueDate, res.dueMonthName)}
                       className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm transition-all flex items-center justify-center"
                       title="Share Reminder"
