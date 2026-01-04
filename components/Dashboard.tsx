@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Floor, Resident, Receipt } from '../types';
 import { Button } from './Button';
 import { BaseModal } from './BaseModal';
-import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Calendar, CheckCircle, Bell, Share2, Eye, X, Phone, Search } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Calendar, CheckCircle, Bell, Share2, Eye, X, Phone, Search, MessageCircle } from 'lucide-react';
 
 interface DashboardProps {
   floors: Floor[];
@@ -202,6 +203,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
     }
   };
 
+  const handleWhatsApp = (mobile: string, name: string) => {
+    const cleanMobile = mobile.replace(/\D/g, '');
+    if (cleanMobile) {
+      const text = `Hello ${name}, this is from Hari PG Management.`;
+      window.open(`https://wa.me/91${cleanMobile}?text=${encodeURIComponent(text)}`, '_blank');
+    } else {
+      alert("No valid mobile number provided.");
+    }
+  };
+
   const sendPaymentReminder = (mobile: string, name: string, dueDate: Date, monthName: string) => {
     const text = `Hello ${name}, your rent for ${monthName} (due since ${dueDate.toLocaleDateString('en-GB')}) is pending. Please process the payment at your earliest. Thank you!`;
     window.open(`https://wa.me/91${mobile.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank');
@@ -330,6 +341,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ floors, setFloors, receipt
                               title="Call Resident"
                             >
                               <Phone size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleWhatsApp(resident.mobile, resident.name)}
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                              title="WhatsApp Resident"
+                            >
+                              <MessageCircle size={16} />
                             </button>
                             <button
                               onClick={() => openResidentModal(floor.id, room.id, resident)}
