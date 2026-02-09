@@ -1,3 +1,4 @@
+
 export interface Resident {
   id: string;
   name: string;
@@ -15,7 +16,7 @@ export interface Room {
 
 export interface Floor {
   id: string;
-  floorNumber: string; // e.g., "Ground Floor", "1st Floor"
+  floorNumber: string;
   rooms: Room[];
 }
 
@@ -26,19 +27,20 @@ export interface Receipt {
   mobileNumber: string;
   amount: number;
   date: string;
-  paymentMethod: string; // 'Cash' | 'UPI' | 'Bank Transfer' | 'Other'
+  paymentMethod: string;
   notes?: string;
 }
 
 export interface AppSettings {
   pgName: string;
+  managerName: string;
   pgSubtitle: string;
   address: string;
   phone: string;
   signatureImage?: string;
-  // Cloud Sync Keys
-  jsonBinSecret?: string; // X-Master-Key
-  jsonBinId?: string;     // Bin ID
+  mapUri?: string;
+  jsonBinSecret?: string;
+  jsonBinId?: string;
 }
 
 export type ViewState = 'dashboard' | 'receipts';
