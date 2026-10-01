@@ -51,7 +51,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose, se
     setIsSharing(false);
   };
 
-  const formattedMonth = new Date(receipt.date).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+  const formattedMonth = receipt.forMonth
+    ? new Date(`${receipt.forMonth}-02`).toLocaleString('en-IN', { month: 'long', year: 'numeric' })
+    : new Date(receipt.date).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 no-print overflow-y-auto">

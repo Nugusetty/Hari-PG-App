@@ -1,10 +1,10 @@
-
 export interface Resident {
   id: string;
   name: string;
   mobile: string;
   rentAmount: number;
   joiningDate?: string;
+  dueDay?: number; // Day of each month rent is due (1-31). Defaults to day of joiningDate
   notes?: string;
 }
 
@@ -28,6 +28,7 @@ export interface Receipt {
   amount: number;
   date: string;
   paymentMethod: string;
+  forMonth?: string; // Format "YYYY-MM", e.g. "2026-10"
   notes?: string;
 }
 
@@ -41,6 +42,20 @@ export interface AppSettings {
   mapUri?: string;
   jsonBinSecret?: string;
   jsonBinId?: string;
+}
+
+export interface DataSnapshot {
+  id: string;
+  timestamp: number;
+  dateString: string;
+  floorsCount: number;
+  roomsCount: number;
+  residentsCount: number;
+  receiptsCount: number;
+  floors: Floor[];
+  receipts: Receipt[];
+  settings: AppSettings;
+  trigger: 'auto' | 'manual';
 }
 
 export type ViewState = 'dashboard' | 'receipts';

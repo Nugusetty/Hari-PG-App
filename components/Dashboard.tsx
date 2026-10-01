@@ -5,7 +5,7 @@ import { BaseModal } from './BaseModal';
 import { ReceiptModal } from './ReceiptModal';
 import { 
   Plus, Trash2, ChevronDown, ChevronRight, Edit2, Calendar, 
-  CheckCircle, Bell, Share2, Eye, X, Phone, Search, MessageCircle,
+  CheckCircle, Bell, Share2, X, Phone, Search, MessageCircle,
   ChevronLeft, History, IndianRupee, FileText
 } from 'lucide-react';
 

@@ -24,6 +24,7 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
     mobileNumber: '',
     amount: 0,
     date: new Date().toISOString().split('T')[0],
+    forMonth: new Date().toISOString().slice(0, 7),
     paymentMethod: 'UPI',
     notes: ''
   });
@@ -32,6 +33,7 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
     if (receipt) {
       setFormData({
         ...receipt,
+        forMonth: receipt.forMonth || receipt.date.slice(0, 7),
         paymentMethod: receipt.paymentMethod || 'UPI' // Handle old records
       });
       setSelectedReceipt(receipt);
@@ -42,6 +44,7 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
         mobileNumber: '',
         amount: 0,
         date: new Date().toISOString().split('T')[0],
+        forMonth: new Date().toISOString().slice(0, 7),
         paymentMethod: 'UPI',
         notes: ''
       });
@@ -143,7 +146,12 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
                 filteredReceipts.map((receipt) => (
                   <tr key={receipt.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(receipt.date).toLocaleDateString()}
+                      <div>{new Date(receipt.date).toLocaleDateString('en-GB')}</div>
+                      {receipt.forMonth && (
+                        <div className="text-[10px] text-blue-600 font-bold">
+                          {new Date(`${receipt.forMonth}-02`).toLocaleString('en-IN', { month: 'short', year: 'numeric' })}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{receipt.residentName}</div>
@@ -256,15 +264,26 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
               </select>
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-            <input 
-              required
-              type="date" 
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              value={formData.date}
-              onChange={e => setFormData({...formData, date: e.target.value})}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+              <input 
+                required
+                type="date" 
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                value={formData.date}
+                onChange={e => setFormData({...formData, date: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">For Month</label>
+              <input 
+                type="month" 
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                value={formData.forMonth || formData.date?.slice(0, 7)}
+                onChange={e => setFormData({...formData, forMonth: e.target.value})}
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
