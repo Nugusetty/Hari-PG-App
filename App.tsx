@@ -3,9 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Floor, Receipt, ViewState, AppSettings } from './types';
 import { Dashboard } from './components/Dashboard';
 import { ReceiptsManager } from './components/ReceiptsManager';
-import { AuthScreen } from './components/AuthScreen';
 import { BaseModal } from './components/BaseModal';
-import { Building2, Settings, Cloud, Loader2, LogOut, Edit2, Trash2, RefreshCw, Download, Upload, FileJson } from 'lucide-react';
+import { Building2, Settings, Cloud, Loader2, Edit2, Trash2, RefreshCw, Download, Upload, FileJson } from 'lucide-react';
 import { Button } from './components/Button';
 
 const safeParse = (data: string | null, fallback: any) => {
@@ -18,10 +17,6 @@ const safeParse = (data: string | null, fallback: any) => {
 };
 
 const App: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return sessionStorage.getItem('hari_pg_auth') === 'true';
-  });
-  
   const [activeTab, setActiveTab] = useState<ViewState>('dashboard');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -62,23 +57,10 @@ const App: React.FC = () => {
     localStorage.setItem('hari_pg_v3_settings', JSON.stringify(settings));
   }, [floors, receipts, settings]);
 
-  const handleLogin = () => {
-    sessionStorage.setItem('hari_pg_auth', 'true');
-    setIsLoggedIn(true);
-  };
-
-  const handleLogout = () => {
-    if (confirm("Log out?")) {
-      sessionStorage.removeItem('hari_pg_auth');
-      setIsLoggedIn(false);
-    }
-  };
-
   const handleFactoryReset = async () => {
     const confirmText = prompt("Type 'REMOVE' to delete all data and uninstall the app service worker.");
     if (confirmText === 'REMOVE') {
       localStorage.clear();
-      sessionStorage.clear();
       if ('serviceWorker' in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const registration of registrations) {
@@ -169,8 +151,6 @@ const App: React.FC = () => {
     }
   };
 
-  if (!isLoggedIn) return <AuthScreen onLogin={handleLogin} />;
-
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <nav className="bg-blue-700 text-white shadow-lg sticky top-0 z-40 no-print">
@@ -183,7 +163,6 @@ const App: React.FC = () => {
             <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-2 rounded text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'bg-blue-800' : 'hover:bg-blue-600'}`}>Dashboard</button>
             <button onClick={() => setActiveTab('receipts')} className={`px-4 py-2 rounded text-sm font-medium transition-colors ${activeTab === 'receipts' ? 'bg-blue-800' : 'hover:bg-blue-600'}`}>Receipts</button>
             <button onClick={() => setIsSettingsOpen(true)} className="p-2 hover:bg-blue-600 rounded transition-colors" title="Settings"><Settings size={20} /></button>
-            <button onClick={handleLogout} className="p-2 hover:bg-red-600 rounded transition-colors"><LogOut size={20} /></button>
           </div>
         </div>
       </nav>
