@@ -15,9 +15,9 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [viewReceipt, setViewReceipt] = useState<Receipt | null>(null);
+  const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null);
   const [search, setSearch] = useState("");
 
-  // Form State
   const [formData, setFormData] = useState<Partial<Receipt>>({
     residentName: '',
     roomNumber: '',
@@ -34,7 +34,7 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
       setFormData({
         ...receipt,
         forMonth: receipt.forMonth || receipt.date.slice(0, 7),
-        paymentMethod: receipt.paymentMethod || 'UPI' // Handle old records
+        paymentMethod: receipt.paymentMethod || 'UPI'
       });
       setSelectedReceipt(receipt);
     } else {
@@ -58,27 +58,23 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
     setSelectedReceipt(null);
   };
 
-  const handleDeleteClick = (id: string) => {
-    if (confirm("Are you sure you want to delete this receipt permanently?")) {
-      setReceipts(prev => prev.filter(r => r.id !== id));
-    }
+  const executeDeleteReceipt = () => {
+    if (!receiptToDelete) return;
+    setReceipts(prev => prev.filter(r => r.id !== receiptToDelete.id));
+    setReceiptToDelete(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (selectedReceipt) {
-      // Edit Mode
       setReceipts(prev => prev.map(r => r.id === selectedReceipt.id ? { ...formData, id: selectedReceipt.id } as Receipt : r));
     } else {
-      // Create Mode
       const newReceipt: Receipt = {
         ...formData as Receipt,
         id: Date.now().toString(),
       };
       setReceipts(prev => [newReceipt, ...prev]);
     }
-
     closeForm();
   };
 
@@ -87,7 +83,6 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
     r.roomNumber.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Calculate Total Amount
   const totalAmount = filteredReceipts.reduce((sum, receipt) => sum + receipt.amount, 0);
 
   return (
@@ -100,7 +95,6 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 justify-between items-end">
-        {/* Search */}
         <div className="relative w-full md:w-auto flex-1">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search size={16} className="text-gray-400" />
@@ -114,8 +108,7 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
           />
         </div>
 
-        {/* Total Display */}
-        <div className="w-full md:w-auto bg-green-50 border border-green-200 rounded-lg px-4 py-2 shadow-sm flex items-center justify-between md:justify-start space-x-4">
+        <div className="w-full md:w-auto bg-green-50 border border-green-200 rounded-lg px-4 py-2 shadow-xs flex items-center justify-between md:justify-start space-x-4">
             <div className="flex items-center text-green-700">
                <Calculator size={18} className="mr-2" />
                <span className="text-sm font-medium">Total Collected</span>
@@ -124,8 +117,7 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xs border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -181,9 +173,9 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
                           <Edit2 size={18} />
                         </button>
                         <button 
-                          onClick={() => handleDeleteClick(receipt.id)}
+                          onClick={() => setReceiptToDelete(receipt)}
                           className="text-gray-400 hover:text-red-600"
-                          title="Delete"
+                          title="Delete Receipt"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -197,7 +189,6 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
       <BaseModal
         isOpen={isFormOpen}
         onClose={closeForm}
@@ -301,7 +292,39 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
         </form>
       </BaseModal>
 
-      {/* Print Preview Modal */}
+      {/* IN-APP CONFIRMATION FOR RECEIPT DELETION */}
+      {receiptToDelete && (
+        <BaseModal isOpen={true} onClose={() => setReceiptToDelete(null)} title="Delete Receipt">
+          <div className="space-y-4">
+            <div className="bg-red-50 p-4 rounded-xl border border-red-200 flex items-start space-x-3">
+              <div className="p-2 bg-red-100 text-red-600 rounded-lg shrink-0">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900 text-base">Permanently Delete Receipt?</h4>
+                <p className="text-sm font-semibold text-red-700 mt-1">
+                  {receiptToDelete.residentName} • Room {receiptToDelete.roomNumber} (₹{receiptToDelete.amount.toLocaleString('en-IN')})
+                </p>
+                <p className="text-xs text-gray-600 mt-1">
+                  Date: {new Date(receiptToDelete.date).toLocaleDateString('en-GB')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2 border-t">
+              <Button variant="secondary" onClick={() => setReceiptToDelete(null)}>Cancel</Button>
+              <Button 
+                variant="danger" 
+                onClick={executeDeleteReceipt} 
+                className="bg-red-600 hover:bg-red-700 text-white font-bold"
+              >
+                Yes, Delete Permanently
+              </Button>
+            </div>
+          </div>
+        </BaseModal>
+      )}
+
       {viewReceipt && (
         <ReceiptModal 
           receipt={viewReceipt} 
