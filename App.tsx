@@ -5,7 +5,8 @@ import { ReceiptsManager } from './components/ReceiptsManager';
 import { BaseModal } from './components/BaseModal';
 import { 
   Building2, Settings, Cloud, Loader2, Edit2, Trash2, 
-  RefreshCw, Download, Upload, ShieldCheck, History, CheckCircle2 
+  RefreshCw, Download, Upload, ShieldCheck, History, CheckCircle2,
+  LayoutDashboard, Receipt as ReceiptIcon 
 } from 'lucide-react';
 import { Button } from './components/Button';
 import { 
@@ -204,35 +205,42 @@ const App: React.FC = () => {
       )}
 
       {/* Top Navbar */}
-      <nav className="bg-blue-700 text-white shadow-lg sticky top-0 z-40 no-print">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <Building2 className="h-7 w-7 text-white" />
-            <div>
-              <span className="font-extrabold text-lg leading-tight block">{settings.pgName}</span>
-              <span className="text-[10px] text-blue-200 uppercase font-semibold tracking-wider">
+      <nav className="bg-blue-700 text-white shadow-md sticky top-0 z-40 no-print">
+        <div className="max-w-7xl mx-auto px-3.5 sm:px-4 h-14 sm:h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="bg-blue-800 p-1.5 rounded-lg shrink-0">
+              <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            </div>
+            <div className="min-w-0">
+              <span className="font-black text-base sm:text-lg leading-tight block truncate tracking-tight">
+                {settings.pgName}
+              </span>
+              <span className="text-[10px] sm:text-[11px] text-blue-200 uppercase font-semibold tracking-wider block truncate">
                 {settings.pgSubtitle || 'PG Management'}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <button 
-              onClick={() => setActiveTab('dashboard')} 
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                activeTab === 'dashboard' ? 'bg-blue-900 text-white shadow-inner' : 'hover:bg-blue-600 text-blue-100'
-              }`}
-            >
-              Dashboard
-            </button>
-            <button 
-              onClick={() => setActiveTab('receipts')} 
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                activeTab === 'receipts' ? 'bg-blue-900 text-white shadow-inner' : 'hover:bg-blue-600 text-blue-100'
-              }`}
-            >
-              Receipts
-            </button>
+          <div className="flex items-center space-x-2 shrink-0">
+            {/* Desktop Navigation Tabs */}
+            <div className="hidden md:flex items-center space-x-1.5 bg-blue-800/80 p-1 rounded-xl">
+              <button 
+                onClick={() => setActiveTab('dashboard')} 
+                className={`px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                  activeTab === 'dashboard' ? 'bg-white text-blue-900 shadow-sm' : 'hover:bg-blue-600 text-blue-100'
+                }`}
+              >
+                Dashboard
+              </button>
+              <button 
+                onClick={() => setActiveTab('receipts')} 
+                className={`px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                  activeTab === 'receipts' ? 'bg-white text-blue-900 shadow-sm' : 'hover:bg-blue-600 text-blue-100'
+                }`}
+              >
+                Receipts
+              </button>
+            </div>
             
             <button 
               onClick={() => setIsSettingsOpen(true)} 
@@ -246,12 +254,12 @@ const App: React.FC = () => {
       </nav>
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 py-6 no-print pb-24">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 no-print pb-28 md:pb-12">
         {activeTab === 'dashboard' ? (
           <Dashboard 
             floors={floors} 
             setFloors={setFloors} 
-            receipts={receipts}
+            receipts={receipts} 
             setReceipts={setReceipts}
             settings={settings}
           />
@@ -263,6 +271,41 @@ const App: React.FC = () => {
           />
         )}
       </main>
+
+      {/* Mobile Native Bottom Navigation Bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 flex items-center justify-around py-1.5 px-3 shadow-lg no-print">
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className={`flex flex-col items-center justify-center py-1 px-4 rounded-xl transition-all ${
+            activeTab === 'dashboard' 
+              ? 'text-blue-700 font-extrabold' 
+              : 'text-gray-500 font-medium hover:text-gray-800'
+          }`}
+        >
+          <LayoutDashboard size={20} className={activeTab === 'dashboard' ? 'stroke-[2.5]' : ''} />
+          <span className="text-[10px] mt-0.5">Dashboard</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('receipts')}
+          className={`flex flex-col items-center justify-center py-1 px-4 rounded-xl transition-all ${
+            activeTab === 'receipts' 
+              ? 'text-blue-700 font-extrabold' 
+              : 'text-gray-500 font-medium hover:text-gray-800'
+          }`}
+        >
+          <ReceiptIcon size={20} className={activeTab === 'receipts' ? 'stroke-[2.5]' : ''} />
+          <span className="text-[10px] mt-0.5">Receipts</span>
+        </button>
+
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          className="flex flex-col items-center justify-center py-1 px-4 rounded-xl text-gray-500 font-medium hover:text-gray-800 transition-all"
+        >
+          <Settings size={20} />
+          <span className="text-[10px] mt-0.5">Settings</span>
+        </button>
+      </div>
 
       {/* Settings & Disaster-Recovery Modal */}
       <BaseModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Settings & Data Protection">

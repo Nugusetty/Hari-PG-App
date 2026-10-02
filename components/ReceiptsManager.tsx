@@ -17,6 +17,7 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
   const [viewReceipt, setViewReceipt] = useState<Receipt | null>(null);
   const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null);
   const [search, setSearch] = useState("");
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>("ALL");
 
   const [formData, setFormData] = useState<Partial<Receipt>>({
     residentName: '',
@@ -33,6 +34,7 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
     if (receipt) {
       setFormData({
         ...receipt,
+        amount: Number(receipt.amount) || 0,
         forMonth: receipt.forMonth || receipt.date.slice(0, 7),
         paymentMethod: receipt.paymentMethod || 'UPI'
       });
@@ -66,11 +68,20 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanAmount = Number(formData.amount) || 0;
+    const cleanReceiptData: Receipt = {
+      ...(formData as Receipt),
+      amount: cleanAmount,
+      date: formData.date || new Date().toISOString().split('T')[0],
+      forMonth: formData.forMonth || (formData.date ? formData.date.slice(0, 7) : new Date().toISOString().slice(0, 7)),
+      paymentMethod: formData.paymentMethod || 'UPI'
+    };
+
     if (selectedReceipt) {
-      setReceipts(prev => prev.map(r => r.id === selectedReceipt.id ? { ...formData, id: selectedReceipt.id } as Receipt : r));
+      setReceipts(prev => prev.map(r => r.id === selectedReceipt.id ? { ...cleanReceiptData, id: selectedReceipt.id } : r));
     } else {
       const newReceipt: Receipt = {
-        ...formData as Receipt,
+        ...cleanReceiptData,
         id: Date.now().toString(),
       };
       setReceipts(prev => [newReceipt, ...prev]);
@@ -78,42 +89,98 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
     closeForm();
   };
 
-  const filteredReceipts = receipts.filter(r => 
-    r.residentName.toLowerCase().includes(search.toLowerCase()) ||
-    r.roomNumber.toLowerCase().includes(search.toLowerCase())
-  );
+  // Distinct available months for filtering
+  const availableMonths = Array.from(new Set(receipts.map(r => {
+    if (r.forMonth) return r.forMonth;
+    if (r.date) return r.date.slice(0, 7);
+    return '';
+  }).filter(Boolean))).sort().reverse();
 
-  const totalAmount = filteredReceipts.reduce((sum, receipt) => sum + receipt.amount, 0);
+  // Filter receipts by search AND selected month
+  const filteredReceipts = receipts.filter(r => {
+    const query = search.trim().toLowerCase();
+    const matchesSearch = !query || 
+      (r.residentName || '').toLowerCase().includes(query) ||
+      (r.roomNumber || '').toLowerCase().includes(query) ||
+      (r.mobileNumber || '').includes(query);
+
+    if (!matchesSearch) return false;
+
+    if (selectedMonthFilter !== "ALL") {
+      const receiptMonth = r.forMonth || (r.date ? r.date.slice(0, 7) : '');
+      return receiptMonth === selectedMonthFilter;
+    }
+
+    return true;
+  });
+
+  // Strict mathematical sum casting to Number to prevent any string concatenation
+  const totalAmount = filteredReceipts.reduce((sum, receipt) => sum + (Number(receipt.amount) || 0), 0);
+  const totalAllTime = receipts.reduce((sum, receipt) => sum + (Number(receipt.amount) || 0), 0);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl font-semibold text-gray-800">Payment Receipts</h2>
-        <Button onClick={() => openForm()}>
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Payment Receipts</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Total {receipts.length} receipts recorded • All-time: ₹{totalAllTime.toLocaleString('en-IN')}
+          </p>
+        </div>
+        <Button onClick={() => openForm()} className="bg-blue-600 hover:bg-blue-700">
           <Plus size={16} className="mr-2" /> Issue Receipt
         </Button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-end">
-        <div className="relative w-full md:w-auto flex-1">
+      <div className="flex flex-col md:flex-row gap-3 justify-between items-stretch md:items-center">
+        {/* Search Input */}
+        <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search size={16} className="text-gray-400" />
           </div>
           <input
             type="text"
-            placeholder="Search by name or room..."
-            className="pl-10 w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Search by name, room or mobile..."
+            className="pl-10 w-full border border-gray-300 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
-        <div className="w-full md:w-auto bg-green-50 border border-green-200 rounded-lg px-4 py-2 shadow-xs flex items-center justify-between md:justify-start space-x-4">
-            <div className="flex items-center text-green-700">
-               <Calculator size={18} className="mr-2" />
-               <span className="text-sm font-medium">Total Collected</span>
+        {/* Month Filter Dropdown */}
+        <div className="w-full md:w-auto">
+          <select
+            value={selectedMonthFilter}
+            onChange={(e) => setSelectedMonthFilter(e.target.value)}
+            className="w-full md:w-auto bg-white border border-gray-300 rounded-xl py-2 px-3 text-sm font-semibold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+            <option value="ALL">All Months ({receipts.length})</option>
+            {availableMonths.map(monthStr => {
+              const label = new Date(`${monthStr}-02`).toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+              const count = receipts.filter(r => (r.forMonth || r.date.slice(0, 7)) === monthStr).length;
+              return (
+                <option key={monthStr} value={monthStr}>
+                  {label} ({count})
+                </option>
+              );
+            })}
+          </select>
+        </div>
+
+        {/* Total Collected Banner with 100% accurate mathematical sum */}
+        <div className="w-full md:w-auto bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 shadow-xs flex items-center justify-between md:justify-start space-x-4">
+          <div className="flex items-center text-emerald-800">
+            <Calculator size={18} className="mr-2 text-emerald-600 shrink-0" />
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block">Total Collected</span>
+              <span className="text-[10px] text-emerald-600 font-medium">
+                {filteredReceipts.length} {filteredReceipts.length === 1 ? 'receipt' : 'receipts'}
+              </span>
             </div>
-            <div className="text-xl font-bold text-green-800">₹{totalAmount.toLocaleString('en-IN')}</div>
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-emerald-900">
+            ₹{totalAmount.toLocaleString('en-IN')}
+          </div>
         </div>
       </div>
 
@@ -153,7 +220,7 @@ export const ReceiptsManager: React.FC<ReceiptsManagerProps> = ({ receipts, setR
                       {receipt.roomNumber}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                      <div>₹{receipt.amount.toLocaleString('en-IN')}</div>
+                      <div>₹{(Number(receipt.amount) || 0).toLocaleString('en-IN')}</div>
                       <div className="text-[10px] text-gray-500 font-normal uppercase">{receipt.paymentMethod || 'Cash'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
